@@ -1,0 +1,478 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>TensorFlow - TensorBoard可视化 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="本章主要说明如何使用TensorBoard进行可视化，以及部分的调参方法。
+
+这是一篇dandelionmane在TensorFlow Dev Summit 2017关于TensorBoard介绍的总结教程。
+转载请说明出处：Gaussic
+在之前的章节中，几乎所有的性能评估都是通过打印中间结果字符"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>TensorFlow - TensorBoard可视化</a></h3></div><div class="post-content"><blockquote>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p> 本章主要说明如何使用TensorBoard进行可视化，以及部分的调参方法。</p>
+</blockquote>
+<p>这是一篇dandelionmane在<a href="https://www.youtube.com/watch?v=eBbEDRsCmv4" target="_blank" rel="noopener">TensorFlow Dev Summit 2017</a>关于TensorBoard介绍的总结教程。</p>
+<p>转载请说明出处：<a href="https://gaussic.github.io/">Gaussic</a></p>
+<p>在之前的章节中，几乎所有的性能评估都是通过打印中间结果字符串来完成的。使用更多的可视化的图表可以让人对模型有一个更加直观的认识。在本章中，我们将使用TensorBoard对模型进行可视化。</p>
+<h3 id="计算图可视化"><a href="#计算图可视化" class="headerlink" title="计算图可视化"></a>计算图可视化</h3><p>要可视化TensorFlow的计算图，需要先构建网络。</p>
+<h4 id="网络层"><a href="#网络层" class="headerlink" title="网络层"></a>网络层</h4><p>本章的网络，依然使用之前几个章节对MNIST数据集使用的网络结构。为了方便实现，固定了其中的一部分参数。相关层如下：</p>
+<pre><code class="python"># 简单卷积层，为方便本章教程叙述，固定部分参数
+def conv_layer(input,
+               channels_in,    # 输入通道数
+               channels_out):  # 输出通道数
+
+    weights = tf.Variable(tf.truncated_normal([5, 5, channels_in, channels_out], stddev=0.05))
+    biases = tf.Variable(tf.constant(0.05, shape=[channels_out]))
+    conv = tf.nn.conv2d(input, filter=weights, strides=[1, 1, 1, 1], padding=&#39;SAME&#39;)
+    act = tf.nn.relu(conv + biases)
+    return act
+
+# 简化全连接层
+def fc_layer(input, num_inputs, num_outputs, use_relu=True):
+    weights = tf.Variable(tf.truncated_normal([num_inputs, num_outputs], stddev=0.05))
+    biases = tf.Variable(tf.constant(0.05, shape=[num_outputs]))
+    act = tf.matmul(input, weights) + biases
+
+    if use_relu:
+        act = tf.nn.relu(act)
+    return act     
+
+# max pooling 层
+def max_pool(input):
+    return tf.nn.max_pool(input, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=&#39;SAME&#39;)
+</code></pre>
+<h4 id="载入数据，构建网络"><a href="#载入数据，构建网络" class="headerlink" title="载入数据，构建网络"></a>载入数据，构建网络</h4><pre><code class="python">from tensorflow.examples.tutorials.mnist import input_data
+data = input_data.read_data_sets(&#39;data/MNIST&#39;, one_hot=True)
+
+x = tf.placeholder(tf.float32, shape=[None, 784])   # 固定这部分值
+y = tf.placeholder(tf.float32, shape=[None, 10])
+x_image = tf.reshape(x, [-1, 28, 28, 1])
+
+conv1 = conv_layer(x_image, 1, 32)   # 增加了卷积核数目
+pool1 = max_pool(conv1)
+
+conv2 = conv_layer(pool1, 32, 64)
+pool2 = max_pool(conv2)
+
+flat_shape = pool2.get_shape()[1:4].num_elements()
+flattened = tf.reshape(pool2, [-1, flat_shape])
+
+fc1 = fc_layer(flattened, flat_shape, 1024)     # 增大神经元数目
+logits = fc_layer(fc1, 1024, 10, use_relu=False)
+</code></pre>
+<h4 id="交叉熵，优化器，准确率"><a href="#交叉熵，优化器，准确率" class="headerlink" title="交叉熵，优化器，准确率"></a>交叉熵，优化器，准确率</h4><pre><code class="python"># 计算交叉熵
+cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=logits))
+
+# 使用Adam优化器来训练
+optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cross_entropy)
+
+# 计算准确率
+correct_prediction = tf.equal(tf.argmax(y, axis=1), tf.argmax(logits, axis=1))
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+</code></pre>
+<h4 id="创建session，训练"><a href="#创建session，训练" class="headerlink" title="创建session，训练"></a>创建session，训练</h4><pre><code class="python">session = tf.Session()
+session.run(tf.global_variables_initializer())
+
+train_batch_size = 100
+
+for i in range(2001):
+    x_batch, y_batch = data.train.next_batch(train_batch_size)
+
+    feed_dict = {x: x_batch, y: y_batch}
+
+    if i % 500 == 0:
+        train_accuracy = session.run(accuracy, feed_dict=feed_dict)
+        print(&quot;迭代轮次: {0:&gt;6}, 训练准确率: {1:&gt;6.4%}&quot;.format(i, train_accuracy))
+
+    session.run(optimizer, feed_dict=feed_dict)
+</code></pre>
+<pre><code class="python">迭代轮次:      0, 训练准确率: 9.0000%
+迭代轮次:    500, 训练准确率: 93.0000%
+迭代轮次:   1000, 训练准确率: 97.0000%
+迭代轮次:   1500, 训练准确率: 98.0000%
+迭代轮次:   2000, 训练准确率: 100.0000%
+</code></pre>
+<p>可见训练效果比较理想。</p>
+<h4 id="可视化计算图"><a href="#可视化计算图" class="headerlink" title="可视化计算图"></a>可视化计算图</h4><p>现在需要将计算图可视化，需要使用tf.summary.FileWriter来将计算图写入指定目录：</p>
+<pre><code class="python">tensorboard_dir = &#39;tensorboard/mnist&#39;   # 保存目录
+if not os.path.exists(tensorboard_dir):
+    os.makedirs(tensorboard_dir)
+
+writer = tf.summary.FileWriter(tensorboard_dir)
+writer.add_graph(session.graph)
+</code></pre>
+<p>以上代码运行结束后，在保存目录下生成了相应文件。在终端运行如下命令：</p>
+<pre><code class="bash">$ tensorboard --logdir tensorboard/mnist
+</code></pre>
+<p>浏览器中访问<a href="localhost:6006" target="_blank" rel="noopener">localhost:6006</a>便可进入TensorBoard控制台。</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/tensorboard1.png" alt="tensorflow-tensorboard/tensorboard1.png"></p>
+<p>当前导航栏除了GRAPHS以外，其他均没有数据，点击进入GRAPHS，可查看如下计算图：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/graph1.png" alt="tensorflow-tensorboard/graph1.png"></p>
+<p>然而，目前来看，这个图实在过于复杂，因为它显示了所有的计算细节。我们需要对代码进行相应的调整。</p>
+<h4 id="命名范围"><a href="#命名范围" class="headerlink" title="命名范围"></a>命名范围</h4><p>我们在之前的章节已经使用了为某个网络模块命名的方法。TensorFlow使用name scope来确定模块的作用范围。对代码进行相应的调整，添加部分名称和作用域：</p>
+<pre><code class="python"># 简单卷积层，为方便本章教程叙述，固定部分参数
+def conv_layer(input,
+               channels_in,    # 输入通道数
+               channels_out,   # 输出通道数
+               name=&#39;conv&#39;):   # 名称
+    with tf.name_scope(name):    # 在该名称作用域下的子变量
+        weights = tf.Variable(tf.truncated_normal([5, 5, channels_in, channels_out],
+                                                  stddev=0.05), name=&#39;W&#39;)
+        biases = tf.Variable(tf.constant(0.05, shape=[channels_out]), name=&#39;B&#39;)
+        conv = tf.nn.conv2d(input, filter=weights, strides=[1, 1, 1, 1], padding=&#39;SAME&#39;)
+        act = tf.nn.relu(conv + biases)
+        return act
+
+# 简化全连接层
+def fc_layer(input, num_inputs, num_outputs, use_relu=True, name=&#39;fc&#39;):
+    with tf.name_scope(name):   # 在该名称作用域下的子变量
+        weights = tf.Variable(tf.truncated_normal([num_inputs, num_outputs],
+                                                  stddev=0.05), name=&#39;W&#39;)
+        biases = tf.Variable(tf.constant(0.05, shape=[num_outputs]), name=&#39;B&#39;)
+        act = tf.matmul(input, weights) + biases
+
+        if use_relu:
+            act = tf.nn.relu(act)
+        return act     
+
+# max pooling 层
+def max_pool(input):
+    return tf.nn.max_pool(input, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=&#39;SAME&#39;)
+</code></pre>
+<p>给其他的部分同样添加名称和相关作用域：</p>
+<pre><code class="python">x = tf.placeholder(tf.float32, shape=[None, 784], name=&#39;x&#39;)
+y = tf.placeholder(tf.float32, shape=[None, 10], name=&#39;labels&#39;)
+x_image = tf.reshape(x, [-1, 28, 28, 1])
+
+conv1 = conv_layer(x_image, 1, 32, &#39;conv1&#39;)
+pool1 = max_pool(conv1)
+
+conv2 = conv_layer(pool1, 32, 64, &#39;conv2&#39;)
+pool2 = max_pool(conv2)
+
+flat_shape = pool2.get_shape()[1:4].num_elements()
+flattened = tf.reshape(pool2, [-1, flat_shape])
+
+fc1 = fc_layer(flattened, flat_shape, 1024, name=&#39;fc1&#39;)
+logits = fc_layer(fc1, 1024, 10, use_relu=False, name=&#39;fc2&#39;)
+
+# 计算交叉熵
+with tf.name_scope(&quot;xent&quot;):
+    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=y, logits=logits))
+
+# 使用Adam优化器来训练
+with tf.name_scope(&#39;optimizer&#39;):
+    optimizer = tf.train.AdamOptimizer(learning_rate=1e-4).minimize(cross_entropy)
+
+# 计算准确率
+with tf.name_scope(&#39;accuracy&#39;):
+    correct_prediction = tf.equal(tf.argmax(y, axis=1), tf.argmax(logits, axis=1))
+    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+</code></pre>
+<p>先不训练，创建一个新的目录保存新的计算图，然后将计算图写入这个目录</p>
+<pre><code class="python">tensorboard_dir = &#39;tensorboard/mnist2&#39;   # 保存目录
+if not os.path.exists(tensorboard_dir):
+    os.makedirs(tensorboard_dir)
+
+writer = tf.summary.FileWriter(tensorboard_dir)
+writer.add_graph(session.graph)
+</code></pre>
+<p>运行tensorboard，将logdir指向新的目录，计算图如下：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/graph2.png" alt="tensorflow-tensorboard/graph2.png"></p>
+<p>现在的计算图变得更加直观容易理解，因为它将部分的细节藏在了一个个大的模块里面。点击某个模块可以查看它的内部细节：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/graph2_detail.png" alt="tensorflow-tensorboard/graph2_detail.png"></p>
+<p>可以看到，定义的名称W和B是属于conv2内部的子名称。</p>
+<p>点击左边的Trace inputs，可以查看数据到某一模块的流向，例如计算accuracy，是x经过了一系列网络层并比对label计算出来的。</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/trace_input.png" alt="tensorflow-tensorboard/trace_input.png"></p>
+<h3 id="标量，直方图"><a href="#标量，直方图" class="headerlink" title="标量，直方图"></a>标量，直方图</h3><p>除了画出模型的计算图外，TensorBoard还支持收集一些准确率、损失等标量信息，检查输入的图像，以及描绘变量的直方图信息等等，这些信息对于评判模型的性能有着重要作用。</p>
+<p>我们需要对代码做一定修改，来收集这些信息。</p>
+<h4 id="卷积层直方图"><a href="#卷积层直方图" class="headerlink" title="卷积层直方图"></a>卷积层直方图</h4><p>使用<code>tf.summary.histogram</code>收集直方图信息。</p>
+<pre><code class="python"># 简单卷积层，为方便本章教程叙述，固定部分参数
+def conv_layer(input,
+               channels_in,    # 输入通道数
+               channels_out,   # 输出通道数
+               name=&#39;conv&#39;):   # 名称
+    with tf.name_scope(name):
+        weights = tf.Variable(tf.truncated_normal([5, 5, channels_in, channels_out],
+                                                  stddev=0.05), name=&#39;W&#39;)
+        biases = tf.Variable(tf.constant(0.05, shape=[channels_out]), name=&#39;B&#39;)
+        conv = tf.nn.conv2d(input, filter=weights, strides=[1, 1, 1, 1], padding=&#39;SAME&#39;)
+        act = tf.nn.relu(conv + biases)
+
+        # 收集以下三个信息，统计直方图
+        tf.summary.histogram(&#39;weights&#39;, weights)   
+        tf.summary.histogram(&#39;biases&#39;, biases)     
+        tf.summary.histogram(&#39;activations&#39;, act)
+        return act
+</code></pre>
+<h4 id="交叉熵，准确率，图像输入"><a href="#交叉熵，准确率，图像输入" class="headerlink" title="交叉熵，准确率，图像输入"></a>交叉熵，准确率，图像输入</h4><p>使用<code>tf.summary.scalar</code>收集标量信息，使用<code>tf.summary.image</code>收集图像。</p>
+<pre><code class="python">tf.summary.scalar(&#39;cross_entropy&#39;, cross_entropy)
+tf.summary.scalar(&#39;accuracy&#39;, accuracy)
+tf.summary.image(&#39;input&#39;, x_image, 3)
+</code></pre>
+<h4 id="保存这些信息"><a href="#保存这些信息" class="headerlink" title="保存这些信息"></a>保存这些信息</h4><p>使用<code>tf.summary.merge_all()</code>，喂入训练数据，可以收集以上定义的所有信息。</p>
+<pre><code class="python">tensorboard_dir = &#39;tensorboard/mnist3&#39;   # 保存到新的目录
+if not os.path.exists(tensorboard_dir):
+    os.makedirs(tensorboard_dir)
+
+merged_summary = tf.summary.merge_all()   # 使用tf.summary.merge_all()，可以收集以上定义的所有信息
+writer = tf.summary.FileWriter(tensorboard_dir)
+writer.add_graph(session.graph)
+</code></pre>
+<p>通过训练进行数据收集</p>
+<pre><code class="python">train_batch_size = 100
+
+for i in range(2001):
+    x_batch, y_batch = data.train.next_batch(train_batch_size)
+
+    feed_dict = {x: x_batch, y: y_batch}
+
+    if i % 5 == 0:   # 运行merger_summary，使用add_summary写入数据
+        # 这里的feed_dict应该使用验证集，但是当前仅作为演示目的，在此不做修改
+        s = session.run(merged_summary, feed_dict=feed_dict)
+        writer.add_summary(s, i)
+
+    if i % 500 == 0:
+        train_accuracy = session.run(accuracy, feed_dict=feed_dict)
+        print(&quot;迭代轮次: {0:&gt;6}, 训练准确率: {1:&gt;6.4%}&quot;.format(i, train_accuracy))
+
+    session.run(optimizer, feed_dict=feed_dict)
+</code></pre>
+<p>运行tensorboard，指向 tensorboard/mnist3。点击导航栏SCALARS：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/scalar_1.png" alt="tensorflow-tensorboard/scalar_1.png"></p>
+<p>显示了准确率和交叉熵在迭代过程中的变化情况，准确率在稳步上升，交叉熵逐渐下降，可见该模型的效果还算理想。</p>
+<p>点击导航栏HISTOGRAMS：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/histogram_1.png" alt="tensorflow-tensorboard/histogram_1.png"></p>
+<p>可以查看变量在不同迭代轮次的直方图分布情况。第一层卷积的权重随着迭代变化较为明显，第二层表现出平滑的趋势。</p>
+<p>点击导航栏IMAGES，可以显示不同迭代轮次的3张图片：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/image_1.png" alt="tensorflow-tensorboard/image_1.png"></p>
+<h3 id="参数搜索"><a href="#参数搜索" class="headerlink" title="参数搜索"></a>参数搜索</h3><p>以上的示例中，TensorBoard都只显示了一个模型的可视化数据。对于不同的参数，如何将多个模型显示在一张图中进行对比？TensorBoard对这一问题作了同样的支持。我们需要调整部分代码，并加入一些参数搜索的代码。</p>
+<h4 id="将-max-pooling-合并到卷积中，将relu从全连接抽离"><a href="#将-max-pooling-合并到卷积中，将relu从全连接抽离" class="headerlink" title="将 max_pooling 合并到卷积中，将relu从全连接抽离"></a>将 max_pooling 合并到卷积中，将relu从全连接抽离</h4><pre><code class="python"># 简单卷积层，为方便本章教程叙述，固定部分参数
+def conv_layer(input,
+               channels_in,    # 输入通道数
+               channels_out,   # 输出通道数
+               name=&#39;conv&#39;):   # 名称
+    with tf.name_scope(name):
+        weights = tf.Variable(tf.truncated_normal([5, 5, channels_in, channels_out],
+                                                  stddev=0.05), name=&#39;W&#39;)
+        biases = tf.Variable(tf.constant(0.05, shape=[channels_out]), name=&#39;B&#39;)
+        conv = tf.nn.conv2d(input, filter=weights, strides=[1, 1, 1, 1], padding=&#39;SAME&#39;)
+        act = tf.nn.relu(conv + biases)
+
+        tf.summary.histogram(&#39;weights&#39;, weights)
+        tf.summary.histogram(&#39;biases&#39;, biases)
+        tf.summary.histogram(&#39;activations&#39;, act)
+
+        return tf.nn.max_pool(act, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=&#39;SAME&#39;)
+
+# 简化全连接层
+def fc_layer(input, num_inputs, num_outputs, name=&#39;fc&#39;):
+    with tf.name_scope(name):
+        weights = tf.Variable(tf.truncated_normal([num_inputs, num_outputs],
+                                                  stddev=0.05), name=&#39;W&#39;)
+        biases = tf.Variable(tf.constant(0.05, shape=[num_outputs]), name=&#39;B&#39;)
+        act = tf.matmul(input, weights) + biases
+
+        tf.summary.histogram(&#39;weights&#39;, weights)
+        tf.summary.histogram(&#39;biases&#39;, biases)
+        tf.summary.histogram(&#39;activations&#39;, act)
+
+        return act
+</code></pre>
+<h4 id="保存到新的目录"><a href="#保存到新的目录" class="headerlink" title="保存到新的目录"></a>保存到新的目录</h4><pre><code class="python">tensorboard_dir = &#39;tensorboard/mnist4/&#39;   # 保存目录
+if not os.path.exists(tensorboard_dir):
+    os.makedirs(tensorboard_dir)
+</code></pre>
+<h4 id="根据不同参数构建模型"><a href="#根据不同参数构建模型" class="headerlink" title="根据不同参数构建模型"></a>根据不同参数构建模型</h4><pre><code class="python">def mnist_model(learning_rate, use_two_fc, use_two_conv, hparam):
+    tf.reset_default_graph()    # 重置计算图
+    sess = tf.Session()
+
+    x = tf.placeholder(tf.float32, shape=[None, 784], name=&quot;x&quot;)
+    x_image = tf.reshape(x, [-1, 28, 28, 1])
+    tf.summary.image(&#39;input&#39;, x_image, 3)
+    y = tf.placeholder(tf.float32, shape=[None, 10], name=&quot;labels&quot;)
+
+    if use_two_conv:    # 是否使用两个卷积
+        conv1 = conv_layer(x_image, 1, 32, &quot;conv1&quot;)
+        conv_out = conv_layer(conv1, 32, 64, &quot;conv2&quot;)
+    else:
+        conv1 = conv_layer(x_image, 1, 64, &quot;conv&quot;)    # 如果使用一个卷积，则再添加一个max_pooling保证维度相通
+        conv_out = tf.nn.max_pool(conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=&quot;SAME&quot;)
+
+    flattened = tf.reshape(conv_out, [-1, 7 * 7 * 64])
+
+    if use_two_fc:    # 是否使用两个全连接
+        fc1 = fc_layer(flattened, 7 * 7 * 64, 1024, &quot;fc1&quot;)
+        relu = tf.nn.relu(fc1)
+        tf.summary.histogram(&quot;fc1/relu&quot;, relu)
+        logits = fc_layer(fc1, 1024, 10, &quot;fc2&quot;)
+    else:
+        logits = fc_layer(flattened, 7*7*64, 10, &quot;fc&quot;)
+
+    with tf.name_scope(&quot;xent&quot;):
+        xent = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits, labels=y), name=&quot;xent&quot;)
+        tf.summary.scalar(&quot;xent&quot;, xent)
+
+    with tf.name_scope(&quot;train&quot;):
+        train_step = tf.train.AdamOptimizer(learning_rate).minimize(xent)
+
+    with tf.name_scope(&quot;accuracy&quot;):
+        correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        tf.summary.scalar(&quot;accuracy&quot;, accuracy)
+
+    summ = tf.summary.merge_all()    # 收集所有的summary
+
+    saver = tf.train.Saver()     # 保存训练过程
+
+    sess.run(tf.global_variables_initializer())
+    writer = tf.summary.FileWriter(tensorboard_dir + hparam)
+    writer.add_graph(sess.graph)
+
+    for i in range(2001):
+        batch = data.train.next_batch(100)
+        if i % 5 == 0:   # 每5轮写入一次
+            # 同上，feed_dict应该使用验证集，但是当前仅作为演示目的，在此不做修改
+            [train_accuracy, s] = sess.run([accuracy, summ], feed_dict={x: batch[0], y: batch[1]})
+            writer.add_summary(s, i)
+
+        if i % 100 == 0:    # 每100轮保存依存训练过程
+            train_accuracy = sess.run(accuracy, feed_dict={x: batch[0], y: batch[1]})
+            saver.save(sess, os.path.join(tensorboard_dir, &quot;model.ckpt&quot;), i)
+
+            print(&quot;迭代轮次: {0:&gt;6}, 训练准确率: {1:&gt;6.4%}&quot;.format(i, train_accuracy))
+
+        sess.run(train_step, feed_dict={x: batch[0], y: batch[1]})
+</code></pre>
+<p>以下函数用于生成超参数的字符串：</p>
+<pre><code class="python">def make_hparam_string(learning_rate, use_two_fc, use_two_conv):
+    conv_param = &quot;conv=2&quot; if use_two_conv else &quot;conv=1&quot;
+    fc_param = &quot;fc=2&quot; if use_two_fc else &quot;fc=1&quot;
+    return &quot;lr_%.0E,%s,%s&quot; % (learning_rate, conv_param, fc_param)
+</code></pre>
+<p>开始训练：</p>
+<pre><code class="python">for learning_rate in [1E-3, 1E-4, 1e-5]:
+    for use_two_fc in [False, True]:
+        for use_two_conv in [False, True]:
+            hparam = make_hparam_string(learning_rate, use_two_fc, use_two_conv)
+            print(&#39;Starting run for %s&#39; % hparam)
+
+            mnist_model(learning_rate, use_two_fc, use_two_conv, hparam)
+
+print(&#39;Done training!&#39;)
+</code></pre>
+<p>在训练过程中即可直接打开tensorboard实时查看训练情况：</p>
+<pre><code class="bash">$ tensorboard --logdir tensorboard/mnist4
+</code></pre>
+<p><img src="/2017/08/16/tensorflow-tensorboard/accuracy1.png" alt="tensorflow-tensorboard/accuracy1.png"></p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/xent1.png" alt="tensorflow-tensorboard/xent1.png"></p>
+<p>以上就显示了不同参数情况下的准确率和交叉熵变化情况，左下角区域可以选择显示几条线。中间的Horizontal Axis同样给了三种不同的显示，STEP按步长，RELATIVE按相对时间，WALL将它们分开显示。鼠标移动到图像上，会给出部分的详细信息：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/accuracy1_detail.png" alt="tensorflow-tensorboard/accuracy1_detail.png"></p>
+<p>其他几个部分也是如此，不再详述。</p>
+<h3 id="Embeddings"><a href="#Embeddings" class="headerlink" title="Embeddings"></a>Embeddings</h3><p>Embeddings可能是TensorBoard最惊艳的部分。它显示了训练样本在三维空间的距离。如下图所示：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/embedding1.png" alt="tensorflow-tensorboard/embedding1.png"></p>
+<p>但是目前我们无法确定某个样本的标签，因此无法确认。需要对代码做一定的修改。</p>
+<p>这里只显示1024张图片，需要两个额外的文件，一个存储标签，一个存储每个点的缩略图。这两个文件可以在<a href="https://github.com/dandelionmane/tf-dev-summit-tensorboard-tutorial/" target="_blank" rel="noopener">dandelionmane的GitHub</a>下载。</p>
+<pre><code class="python">LABELS = os.path.join(os.getcwd(), &quot;labels_1024.tsv&quot;)
+SPRITES = os.path.join(os.getcwd(), &quot;sprite_1024.png&quot;)
+
+def mnist_model(learning_rate, use_two_fc, use_two_conv, hparam):
+    tf.reset_default_graph()    # 重置计算图
+    sess = tf.Session()
+
+    x = tf.placeholder(tf.float32, shape=[None, 784], name=&quot;x&quot;)
+    x_image = tf.reshape(x, [-1, 28, 28, 1])
+    tf.summary.image(&#39;input&#39;, x_image, 3)
+    y = tf.placeholder(tf.float32, shape=[None, 10], name=&quot;labels&quot;)
+
+    if use_two_conv:    # 是否使用两个卷积
+        conv1 = conv_layer(x_image, 1, 32, &quot;conv1&quot;)
+        conv_out = conv_layer(conv1, 32, 64, &quot;conv2&quot;)
+    else:
+        conv1 = conv_layer(x_image, 1, 64, &quot;conv&quot;)    # 如果使用一个卷积，则再添加一个max_pooling保证维度相通
+        conv_out = tf.nn.max_pool(conv1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding=&quot;SAME&quot;)
+
+    flattened = tf.reshape(conv_out, [-1, 7 * 7 * 64])
+
+    if use_two_fc:    # 是否使用两个全连接
+        fc1 = fc_layer(flattened, 7 * 7 * 64, 1024, &quot;fc1&quot;)
+        relu = tf.nn.relu(fc1)
+        embedding_input = relu
+        tf.summary.histogram(&quot;fc1/relu&quot;, relu)
+        embedding_size = 1024
+        logits = fc_layer(fc1, 1024, 10, &quot;fc2&quot;)
+    else:
+        embedding_input = flattened   # 新添加的embedding_input和embedding_size
+        embedding_size = 7*7*64
+        logits = fc_layer(flattened, 7*7*64, 10, &quot;fc&quot;)
+
+    with tf.name_scope(&quot;xent&quot;):
+        xent = tf.reduce_mean(
+            tf.nn.softmax_cross_entropy_with_logits(
+                logits=logits, labels=y), name=&quot;xent&quot;)
+        tf.summary.scalar(&quot;xent&quot;, xent)
+
+    with tf.name_scope(&quot;train&quot;):
+        train_step = tf.train.AdamOptimizer(learning_rate).minimize(xent)
+
+    with tf.name_scope(&quot;accuracy&quot;):
+        correct_prediction = tf.equal(tf.argmax(logits, 1), tf.argmax(y, 1))
+        accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+        tf.summary.scalar(&quot;accuracy&quot;, accuracy)
+
+    summ = tf.summary.merge_all()    # 收集所有的summary
+
+    # 添加embedding变量
+    embedding = tf.Variable(tf.zeros([1024, embedding_size]), name=&quot;test_embedding&quot;)
+    assignment = embedding.assign(embedding_input)
+    saver = tf.train.Saver()     # 保存训练过程
+
+    sess.run(tf.global_variables_initializer())
+    writer = tf.summary.FileWriter(tensorboard_dir + hparam)
+    writer.add_graph(sess.graph)
+
+    # embedding的配置，详见官方文档
+    config = tf.contrib.tensorboard.plugins.projector.ProjectorConfig()
+    embedding_config = config.embeddings.add()
+    embedding_config.tensor_name = embedding.name
+    embedding_config.sprite.image_path = SPRITES
+    embedding_config.metadata_path = LABELS
+    # Specify the width and height of a single thumbnail.
+    embedding_config.sprite.single_image_dim.extend([28, 28])
+    tf.contrib.tensorboard.plugins.projector.visualize_embeddings(writer, config)
+
+    for i in range(2001):
+        batch = data.train.next_batch(100)
+        if i % 5 == 0:   # 每5轮写入一次
+            # 同样，最好使用验证集
+            [train_accuracy, s] = sess.run([accuracy, summ], feed_dict={x: batch[0], y: batch[1]})
+            writer.add_summary(s, i)
+
+        if i % 100 == 0:    # 每100轮保存依存训练过程
+            sess.run(assignment, feed_dict={x: data.test.images[:1024], y: data.test.labels[:1024]})
+            train_accuracy = sess.run(accuracy, feed_dict={x: batch[0], y: batch[1]})
+            saver.save(sess, os.path.join(tensorboard_dir, &quot;model.ckpt&quot;), i)
+
+            print(&quot;迭代轮次: {0:&gt;6}, 训练准确率: {1:&gt;6.4%}&quot;.format(i, train_accuracy))
+
+        sess.run(train_step, feed_dict={x: batch[0], y: batch[1]})
+</code></pre>
+<p>初始运行时，样本基本分散在空间中，没有什么特殊的规律：</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/tsne1.png" alt="tensorflow-tensorboard/tsne1.png"></p>
+<p>在经过多轮的迭代后，相同类别的样本聚集在了一起，不同类别的样本分散开来，呈现聚类趋势，虽然存在部分的误分样本。</p>
+<p><img src="/2017/08/16/tensorflow-tensorboard/tsne2.png" alt="tensorflow-tensorboard/tsne2.png"></p>
+<p>可见，Embedding能够反映聚类的属性，这对我们观察分类性能有很直观的帮助。Embedding常用在文本中，例如判断词向量的相似程度。</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2017-08-16</span><i class="fa fa-tag"></i><a href="/categories/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a><a href="/tags/TensorFlow/" title="TensorFlow" class="tag">TensorFlow </a><a href="/tags/Tutorial/" title="Tutorial" class="tag">Tutorial </a><a href="/tags/Visualization/" title="Visualization" class="tag">Visualization </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2017/08/16/tensorflow-tensorboard/,夜露,TensorFlow - TensorBoard可视化,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2017/08/24/tensorflow-language-model/" title="使用TensorFlow训练循环神经网络语言模型" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2017/08/15/tensorflow-saver/" title="TensorFlow - 保存/恢复/提前终止" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config("");
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end --></body></html>

@@ -1,0 +1,175 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>TF-IDF关键词提取实现 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="本文旨在对特定的语料库生成各词的逆文档频率。然后根据TF-IDF算法进行关键词提取。
+
+转载请注明出处：Gaussic 。
+GitHub代码：https://github.com/gaussic/tf-idf-keyword
+分词对于中文文本的关键词提取，需要先进行分词操作。
+去除其中的一些英文和数"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>TF-IDF关键词提取实现</a></h3></div><div class="post-content"><blockquote>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>本文旨在对特定的语料库生成各词的逆文档频率。然后根据TF-IDF算法进行关键词提取。</p>
+</blockquote>
+<p>转载请注明出处：<a href="https://gaussic.github.io/">Gaussic</a> 。</p>
+<p>GitHub代码：<a href="https://github.com/gaussic/tf-idf-keyword" target="_blank" rel="noopener">https://github.com/gaussic/tf-idf-keyword</a></p>
+<h3 id="分词"><a href="#分词" class="headerlink" title="分词"></a>分词</h3><p>对于中文文本的关键词提取，需要先进行分词操作。</p>
+<p>去除其中的一些英文和数字，只保留中文：</p>
+<pre><code class="python">import jieba
+import re
+
+def segment(sentence, cut_all=False):
+    sentence = sentence.replace(&#39;\n&#39;, &#39;&#39;).replace(&#39;\u3000&#39;, &#39;&#39;).replace(&#39;\u00A0&#39;, &#39;&#39;)
+    sentence = &#39; &#39;.join(jieba.cut(sentence, cut_all=cut_all))
+    return re.sub(&#39;[a-zA-Z0-9.。:：,，)）(（！!??”“\&quot;]&#39;, &#39;&#39;, sentence).split()
+</code></pre>
+<h3 id="语料库逆文档频率统计"><a href="#语料库逆文档频率统计" class="headerlink" title="语料库逆文档频率统计"></a>语料库逆文档频率统计</h3><h4 id="高效文件读取"><a href="#高效文件读取" class="headerlink" title="高效文件读取"></a>高效文件读取</h4><p>读取指定目录下的所有文本文件，使用结巴分词器进行分词。本文的IDF提取基于<a href="http://thuctc.thunlp.org/#%E4%B8%AD%E6%96%87%E6%96%87%E6%9C%AC%E5%88%86%E7%B1%BB%E6%95%B0%E6%8D%AE%E9%9B%86THUCNews" target="_blank" rel="noopener">THUCNews清华新闻语料库</a>的大约80万篇文本。</p>
+<p>基于python生成器的实现，以下代码可以实现高效地读取文本并分词：</p>
+<pre><code class="python">class MyDocuments(object):    # memory efficient data streaming
+    def __init__(self, dirname):
+        self.dirname = dirname
+        if not os.path.isdir(dirname):
+            print(dirname, &#39;- not a directory!&#39;)
+            sys.exit()
+
+    def __iter__(self):
+        for dirfile in os.walk(self.dirname):
+            for fname in dirfile[2]:
+                text = open(os.path.join(dirfile[0], fname),
+                            &#39;r&#39;, encoding=&#39;utf-8&#39;, errors=&#39;ignore&#39;).read()
+                yield segment(text)   # time consuming
+</code></pre>
+<h4 id="词的逆文档频数统计"><a href="#词的逆文档频数统计" class="headerlink" title="词的逆文档频数统计"></a>词的逆文档频数统计</h4><p>统计每一个词出现在多少篇文档中：</p>
+<pre><code class="python">documents = MyDocuments(inputdir)
+
+ignored = {&#39;&#39;, &#39; &#39;, &#39;&#39;, &#39;。&#39;, &#39;：&#39;, &#39;，&#39;, &#39;）&#39;, &#39;（&#39;, &#39;！&#39;, &#39;?&#39;, &#39;”&#39;, &#39;“&#39;}
+id_freq = {}
+i = 0
+for doc in documents:
+    doc = set(x for x in doc if x not in ignored)
+    for x in doc:
+        id_freq[x] = id_freq.get(x, 0) + 1
+    if i % 1000 == 0:
+        print(&#39;Documents processed: &#39;, i, &#39;, time: &#39;,
+            datetime.datetime.now())
+    i += 1
+</code></pre>
+<p>计算逆文档频率并存储</p>
+<pre><code class="python">with open(outputfile, &#39;w&#39;, encoding=&#39;utf-8&#39;) as f:
+    for key, value in id_freq.items():
+        f.write(key + &#39; &#39; + str(math.log(i / value, 2)) + &#39;\n&#39;)
+</code></pre>
+<p>逆文档频率(IDF)计算公式</p>
+<p>$$<br>IDF(w) = log_2(\frac{D}{D_w})<br>$$</p>
+<p>其中，$D$表示总文档数，$D_w$表示词w出现在多少篇文档中。</p>
+<h4 id="运行示例："><a href="#运行示例：" class="headerlink" title="运行示例："></a>运行示例：</h4><pre><code>Building prefix dict from the default dictionary ...
+Loading model from cache /var/folders/65/1sj9q72d15gg80vt9c70v9d80000gn/T/jieba.cache
+Loading model cost 0.943 seconds.
+Prefix dict has been built succesfully.
+Documents processed:  0 , time:  2017-08-08 17:11:15.906739
+Documents processed:  1000 , time:  2017-08-08 17:11:18.857246
+Documents processed:  2000 , time:  2017-08-08 17:11:21.762615
+Documents processed:  3000 , time:  2017-08-08 17:11:24.534753
+Documents processed:  4000 , time:  2017-08-08 17:11:27.235600
+Documents processed:  5000 , time:  2017-08-08 17:11:29.974688
+Documents processed:  6000 , time:  2017-08-08 17:11:32.818768
+Documents processed:  7000 , time:  2017-08-08 17:11:35.797916
+Documents processed:  8000 , time:  2017-08-08 17:11:39.232018
+</code></pre><p>可见，处理1000篇文档用时大约3秒，80万篇大约用时40分钟。</p>
+<h3 id="TF-IDF关键词提取"><a href="#TF-IDF关键词提取" class="headerlink" title="TF-IDF关键词提取"></a>TF-IDF关键词提取</h3><p>借鉴了结巴分词的处理思路，使用IDFLoader载入IDF文件：</p>
+<pre><code class="python">class IDFLoader(object):
+    def __init__(self, idf_path):
+        self.idf_path = idf_path
+        self.idf_freq = {}     # idf
+        self.mean_idf = 0.0    # 均值
+        self.load_idf()
+
+    def load_idf(self):       # 从文件中载入idf
+        cnt = 0
+        with open(self.idf_path, &#39;r&#39;, encoding=&#39;utf-8&#39;) as f:
+            for line in f:
+                try:
+                    word, freq = line.strip().split(&#39; &#39;)
+                    cnt += 1
+                except Exception as e:
+                    pass
+                self.idf_freq[word] = float(freq)
+
+        print(&#39;Vocabularies loaded: %d&#39; % cnt)
+        self.mean_idf = sum(self.idf_freq.values()) / cnt
+</code></pre>
+<p>使用TF-IDF抽取关键词。TF-IDF计算公式：</p>
+<p>$$<br>TFIDF(w) = TF(w) * IDF(w)<br>$$</p>
+<pre><code class="python">class TFIDF(object):
+    def __init__(self, idf_path):
+        self.idf_loader = IDFLoader(idf_path)
+        self.idf_freq = self.idf_loader.idf_freq
+        self.mean_idf = self.idf_loader.mean_idf
+
+    def extract_keywords(self, sentence, topK=20):    # 提取关键词
+        # 过滤
+        seg_list = segment(sentence)
+
+        freq = {}
+        for w in seg_list:
+            freq[w] = freq.get(w, 0.0) + 1.0
+        total = sum(freq.values())
+
+        for k in freq:   # 计算 TF-IDF
+            freq[k] *= self.idf_freq.get(k, self.mean_idf) / total
+
+        tags = sorted(freq, key=freq.__getitem__, reverse=True)  # 排序
+
+        if topK:
+            return tags[:topK]
+        else:
+            return tags
+</code></pre>
+<p>使用：</p>
+<pre><code class="python"># idffile为idf文件路径, document为待处理文本路径
+tdidf = TFIDF(idffile)
+sentence = open(document, &#39;r&#39;, encoding=&#39;utf-8&#39;, errors=&#39;ignore&#39;).read()
+tags = tdidf.extract_keywords(sentence, topK)
+</code></pre>
+<p>原文档：</p>
+<pre><code>AMD力推812核服务器处理器反攻英特尔
+　　AMD今日正式推出最新的8核心及12核心系列处理器产品，从而正式在服务器领域向英特尔吹起了进攻的号角。
+　　AMD的8核和12核服务器处理器都采用了新的45纳米设计，而且也都是由两块处理器die封装在一起构建，其中12核心处理器正是基于此前曝光的Magny-Cours核心，也就是两个6核伊斯坦布尔核心封装在一起，而8核处理器则是由两颗4核处理器die封装在一起构建。
+　　新推出的8核和12核处理器将支持全新的G34插槽，可提供更新的I/O技术，另外由于可以支持四条DDR3内存通道因此每颗处理器可以支持多达12条内存插槽。
+　　此次新推的8核和12核处理器产品将会隶属于Opteron 6100系列，最低起始主频为1.8GHz，其中8核最低版本型号为Opteron 6124 HE，而该系列最高版本则为主频2.3GHz的12核Opteron 6176 SE。在Opteron 6100系列里，1.8GHz的8核Opteron 6124 HE功耗较低仅为65W，具体的售价则为455美元，折合人民币3100元出头。主频2.3GHz的12核Opteron 6176 SE功耗为105W，售价为1386美元，折合人民币约为9466元。其他产品的规格和价格多介于这两款产品之间。
+　　性能方面，AMD Opteron 6100系列比此前的6核伊斯坦布尔处理器要强悍很多，按照AMD方面的说法整数运算性能提升达88%，同时浮点运算性能更是提升了119%之多。Opteron 6000系列服务器平台主要将配备四个或者两个插槽，也就是说入门级系统核心数量为16个，而高阶版系统核心数量可达48个。
+　　与AMD相对的是英特尔也正计划针对多处理器服务器市场推出一款8核心的芯片产品，这款产品也被称为“Nehalem-EX”，这款产品应该也已经离正式上市不远。
+</code></pre><p>示例输出：</p>
+<pre><code>核
+处理器
+服务器
+系统核心
+封装
+系列
+插槽
+核心
+主频
+产品
+伊斯坦布尔
+英特尔
+功耗
+多处理器
+低仅
+折合
+浮点运算
+性能
+构建
+吹起
+</code></pre></div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2017-08-08</span><i class="fa fa-tag"></i><a href="/categories/Text-Processing/" title="Text Processing" class="tag">Text Processing </a><a href="/tags/Python/" title="Python" class="tag">Python </a><a href="/tags/Text/" title="Text" class="tag">Text </a><a href="/tags/TF-IDF/" title="TF-IDF" class="tag">TF-IDF </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2017/08/08/tf-idf-generation/,夜露,TF-IDF关键词提取实现,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2017/08/11/tensorflow-linear-model/" title="TensorFlow - 线性模型" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2017/05/05/pytorch-60-minutes/" title="Pytorch整理：60分钟入门" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config("");
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end --></body></html>

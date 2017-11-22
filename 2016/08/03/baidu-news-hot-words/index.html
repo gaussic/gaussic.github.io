@@ -1,0 +1,152 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>百度新闻热搜词抓取 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="原抓取网址为：http://news.baidu.com/n?cmd=1&amp;amp;class=reci
+Github代码：点击访问
+转载请注明出处：https://gaussic.github.io
+接口与参数接口的 base_url 为 http://news.baidu.com/n?m=rdda"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>百度新闻热搜词抓取</a></h3></div><div class="post-content"><p>原抓取网址为：<a href="http://news.baidu.com/n?cmd=1&amp;class=reci" target="_blank" rel="noopener">http://news.baidu.com/n?cmd=1&amp;class=reci</a></p>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>Github代码：<a href="https://github.com/gaussic/baidu_hot_words" target="_blank" rel="noopener">点击访问</a></p>
+<p>转载请注明出处：<a href="https://gaussic.github.io">https://gaussic.github.io</a></p>
+<h4 id="接口与参数"><a href="#接口与参数" class="headerlink" title="接口与参数"></a>接口与参数</h4><p>接口的 <code>base_url</code> 为 <a href="http://news.baidu.com/n?m=rddata&amp;v=hot_word" target="_blank" rel="noopener">http://news.baidu.com/n?m=rddata&amp;v=hot_word</a></p>
+<p>带两个参数</p>
+<ul>
+<li>type：0(全部)、2(国内)、1(国际)、5(社会)、14(军事)、6(财经)、10(汽车)、8(科技)、4(娱乐)、3(体育)</li>
+<li>date：格式为 20160703、20160704、20160705，以此类推</li>
+</ul>
+<a id="more"></a>
+<h4 id="使用-requests-抓取关键词数据"><a href="#使用-requests-抓取关键词数据" class="headerlink" title="使用 requests 抓取关键词数据:"></a>使用 requests 抓取关键词数据:</h4><pre><code class="python">import requests  
+from bs4 import BeautifulSoup
+
+# 基本Url
+base_url = &#39;http://news.baidu.com/n?m=rddata&amp;v=hot_word&#39;  
+hot_type = &#39;0&#39;
+
+parameters = {&#39;type&#39;: hot_type}
+
+# 获取 JSON 数据
+r = requests.get(base_url, params=parameters)  
+print(r.url)
+
+hot_words_dict = r.json()
+
+# 输出热搜关键词
+for hot_word in hot_words_dict.get(&#39;data&#39;):  
+    print(hot_word.get(&#39;query_word&#39;))
+</code></pre>
+<p>输出结果：</p>
+<pre><code>http://news.baidu.com/n?m=rddata&amp;v=hot_word&amp;type=0  
+习近平回信勉励[br]乌兰牧骑队员
+习近平致丝路沿线民间合作网络论坛贺信
+头颅[br]移植手术成功
+济州岛[br]迎中旅游团
+2018[br]全球强震或增
+趴折叠床[br]辅导学生
+国产直升机试飞成功
+中国在太平洋岛国投资基建
+无人售货纸箱亮相西南大学
+惠普CEO惠特曼将于明年初离职
+台风“玛娃”致广东多地暴雨 广州深圳等多市停课
+制鞋机器人问世！8小时能制造600双耐克鞋
+试飞危险吗？C919首飞机长这样说
+陕西彬县(塌陷)发生3.2级地震 震源深度0千米
+欲入中国籍替征战奥运 这位华裔美女闪亮全运赛场
+中国首个火星模拟基地总体方案敲定 总投资逾4亿元
+多个城市暂停投放共享单车 摩拜与ofo回应
+教师因&quot;鸡汤文&quot;成网红:从不崇拜所谓的高考状元
+飓风&quot;哈维&quot;导致美国得州近30万居民断电 暂无伤亡
+警惕！骗子盯上共享单车 通过假冒客服平台诈骗
+台湾年轻人对台失去信心转赴大陆：大陆才是未来
+呼和浩特街头现大量神翻译店名
+农业部回应食物农药残留
+农业部回应：欧洲“毒鸡蛋”未进入中国内地市场
+日战机对华紧急起飞数激增 4架战机对1架中国飞机
+全国将建2442公里红色旅游公路
+NHK自揭731细菌战暴行：首指日本医学界之罪
+大熊猫国家公园正式获批 总面积达27134平方公里
+76集团军特战部队在高原展开陆空联合演习
+江西挖出巨型阴沉木
+</code></pre><h4 id="添加日期参数"><a href="#添加日期参数" class="headerlink" title="添加日期参数"></a>添加日期参数</h4><p>日期格式为 <code>YYYYMMDD</code>，如 20171122</p>
+<pre><code class="python">hot_type = &#39;2&#39;   # 国内
+hot_date = &#39;20171122&#39;
+
+parameters = {&#39;type&#39;: hot_type, &#39;date&#39;: hot_date}
+
+# 获取 JSON 数据
+r = requests.get(base_url, params=parameters)  
+print(r.url)
+
+hot_words_dict = r.json()
+
+# 输出热搜关键词
+for hot_word in hot_words_dict.get(&#39;data&#39;):  
+    print(hot_word.get(&#39;query_word&#39;))
+</code></pre>
+<p>输出结果：</p>
+<pre><code>http://news.baidu.com/n?m=rddata&amp;v=hot_word&amp;type=2&amp;date=20160705  
+海南最牛副局长被双开
+婚姻登记下月起免费
+ 记者访中央机关食堂
+高铁要调价了
+男子抓巨大&quot;土豪金&quot;鱼
+河南挖出500年前古墓
+大老虎自曝与女星情史
+南京南站男子被卡身亡
+香港将迎首位女特首
+女子让儿子停课晒太阳
+济南公安下属企业放贷
+女镇长拍写真走红
+24省下月同日省考
+厅长欲掏2亿买副省长
+中介为卖房和客户结婚
+东北最牛大学停飞机
+上海虹口体育场火灾
+济南最牛钉子户被拆
+复旦大学实验室爆炸
+日本最美女大学生
+北京未来15年规划
+女子无钱打车报警
+起底聊城讨债团队
+韩称遭中国网络攻击
+山东现国内最大金矿
+最牛妈妈两胎生五子
+护士怒怼医托
+3名中国人在菲遭绑架
+白洋淀搬迁每亩补6万
+习近平会见美国国务卿
+</code></pre><h4 id="按关键词抓取新闻"><a href="#按关键词抓取新闻" class="headerlink" title="按关键词抓取新闻"></a>按关键词抓取新闻</h4><p>基本url为 <a href="http://news.baidu.com/ns?tn=news" target="_blank" rel="noopener">http://news.baidu.com/ns?tn=news</a>，接参数word字段。</p>
+<pre><code class="python">query_word = &#39;香港将迎首位女特首&#39;  
+news_base_url = &#39;http://news.baidu.com/ns?tn=news&#39;
+
+parameters = {&#39;word&#39;: query_word}
+
+# 获取 JSON 数据
+r = requests.get(news_base_url, params=parameters)  
+print(r.url)
+
+soup = BeautifulSoup(r.text, &#39;lxml&#39;)   # lxml可以换成其他解析库
+news_html_list = soup.select(&#39;div.result&#39;)  
+news_list = []  
+for news_html in news_html_list:  
+    news = {}
+    news[&#39;标题&#39;] = news_html.a.get_text().strip()
+    news[&#39;链接&#39;] = news_html.a[&#39;href&#39;]
+    source = news_html.find(&#39;p&#39;, &#39;c-author&#39;).get_text().strip().replace(&#39;\xa0\xa0&#39;, &#39; &#39;).split(&#39; &#39;)
+    news[&#39;来源&#39;] = source[0]
+    news[&#39;发布日期&#39;] = source[1]
+
+    news_list.append(news)
+
+import json
+for news in news_list:
+    print(json.dumps(news, ensure_ascii=False))
+</code></pre>
+<p>输出结果：</p>
+<pre><code class="bson">{&quot;标题&quot;: &quot;香港将迎首位女特首:出身贫寒 曾因考第四名痛哭一晚}_《参考消息...&quot;, &quot;链接&quot;: &quot;http://news.163.com/17/0327/17/CGI6I4RV00018AOQ.html&quot;, &quot;来源&quot;: &quot;网易&quot;, &quot;发布日期&quot;: &quot;2017年03月27日&quot;}
+{&quot;标题&quot;: &quot;香港将迎来首位女特首:出身贫寒 曾批“占中”&quot;, &quot;链接&quot;: &quot;http://news.china.com/domestic/945/20170327/30360029.html&quot;, &quot;来源&quot;: &quot;中华网&quot;, &quot;发布日期&quot;: &quot;2017年03月27日&quot;}
+{&quot;标题&quot;: &quot;香港首位女特首被评\&quot;实干派\&quot; 曾批\&quot;占中\&quot;乱港&quot;, &quot;链接&quot;: &quot;http://news.163.com/17/0326/22/CGG4QMGM0001875N.html&quot;, &quot;来源&quot;: &quot;网易&quot;, &quot;发布日期&quot;: &quot;2017年03月26日&quot;}
+{&quot;标题&quot;: &quot;香港或迎首位女特首 林郑月娥长子剑桥毕业小米任职&quot;, &quot;链接&quot;: &quot;http://www.donews.com/news/detail/4/2949453.html&quot;, &quot;来源&quot;: &quot;DoNews&quot;, &quot;发布日期&quot;: &quot;2017年03月26日&quot;}
+{&quot;标题&quot;: &quot;香港将迎来首位女特首 林郑月娥对港独态度强硬&quot;, &quot;链接&quot;: &quot;http://www.cnbzol.com/news/20170327114934.htm&quot;, &quot;来源&quot;: &quot;巴中在线&quot;, &quot;发布日期&quot;: &quot;2017年03月27日&quot;}
+{&quot;标题&quot;: &quot;香港将迎首位女特首 林郑月娥个人简历资料照片(图)&quot;, &quot;链接&quot;: &quot;http://www.mnw.cn/news/china/1645293-2.html&quot;, &quot;来源&quot;: &quot;闽南网&quot;, &quot;发布日期&quot;: &quot;2017年03月27日&quot;}
+{&quot;标题&quot;: &quot;香港迎首位女特首&quot;, &quot;链接&quot;: &quot;http://www.shuyang.tv/news/china/2017-03-27/208931.html&quot;, &quot;来源&quot;: &quot;沭阳网&quot;, &quot;发布日期&quot;: &quot;2017年03月27日&quot;}
+{&quot;标题&quot;: &quot;香港迎来首位女特首林郑月娥:寒门中苦读 作风果断民望高&quot;, &quot;链接&quot;: &quot;http://n.cztv.com/news/12468870.html&quot;, &quot;来源&quot;: &quot;新蓝网&quot;, &quot;发布日期&quot;: &quot;2017年03月26日&quot;}
+{&quot;标题&quot;: &quot;香港回归20年来将有首位女特首&quot;, &quot;链接&quot;: &quot;http://news.sina.com.cn/o/2017-03-27/060433853302.shtml&quot;, &quot;来源&quot;: &quot;新浪新闻&quot;, &quot;发布日期&quot;: &quot;2017年03月27日&quot;}
+{&quot;标题&quot;: &quot;她是香港回归以来首位女特首 将加强市民对特区政府的信任作为施政...&quot;, &quot;链接&quot;: &quot;http://news.163.com/17/0702/00/COA3HA1B00018AOP.html&quot;, &quot;来源&quot;: &quot;网易&quot;, &quot;发布日期&quot;: &quot;2017年07月02日&quot;}
+</code></pre>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-03</span><i class="fa fa-tag"></i><a href="/categories/Technology/" title="Technology" class="tag">Technology </a><a href="/tags/Python/" title="Python" class="tag">Python </a><a href="/tags/爬虫/" title="爬虫" class="tag">爬虫 </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2016/08/03/baidu-news-hot-words/,夜露,百度新闻热搜词抓取,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2017/03/02/lstm-language-model/" title="基于LSTM的语言模型" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2016/08/03/django-uwsgi-deploy/" title="Django + uWSGI部署" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end --></body></html>

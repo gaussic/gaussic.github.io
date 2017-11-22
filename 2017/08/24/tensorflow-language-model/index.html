@@ -1,0 +1,343 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>使用TensorFlow训练循环神经网络语言模型 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="读了将近一个下午的TensorFlow Recurrent Neural Network教程，翻看其在PTB上的实现，感觉晦涩难懂，因此参考了部分代码，自己写了一个简化版的Language Model，思路借鉴了Keras的LSTM text generation。
+代码地址：Github
+转载请注"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>使用TensorFlow训练循环神经网络语言模型</a></h3></div><div class="post-content"><p>读了将近一个下午的<a href="https://www.tensorflow.org/tutorials/recurrent" target="_blank" rel="noopener">TensorFlow Recurrent Neural Network</a>教程，翻看其在<a href="https://github.com/tensorflow/models/tree/master/tutorials/rnn/ptb" target="_blank" rel="noopener">PTB</a>上的实现，感觉晦涩难懂，因此参考了部分代码，自己写了一个简化版的Language Model，思路借鉴了Keras的<a href="https://github.com/fchollet/keras/blob/master/examples/lstm_text_generation.py" target="_blank" rel="noopener">LSTM text generation</a>。</p>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>代码地址：<a href="https://github.com/gaussic/tf-rnnlm" target="_blank" rel="noopener">Github</a></p>
+<p>转载请注明出处：<a href="https://gaussic.github.io/">Gaussic</a></p>
+<h3 id="语言模型"><a href="#语言模型" class="headerlink" title="语言模型"></a>语言模型</h3><p>Language Model，即语言模型，其主要思想是，在知道前一部分的词的情况下，推断出下一个最有可能出现的词。例如，知道了 <code>The fat cat sat on the</code>，我们认为下一个词为<code>mat</code>的可能性比<code>hat</code>要大，因为猫更有可能坐在毯子上，而不是帽子上。</p>
+<p>这可能被你认为是常识，但是在自然语言处理中，这个任务是可以用概率统计模型来描述的。就拿<code>The fat cat sat on the mat</code>来说。我们可能统计出第一个词<code>The</code>出现的概率 $p(The)$ ，<code>The</code>后面是<code>fat</code>的条件概率为 $p(fat|The)$ ，<code>The fat</code>同时出现的联合概率：</p>
+<p>$$<br>p(The, fat) = p(The)·p(fat|The)<br>$$</p>
+<p>这个联合概率，就是<code>The fat</code>的合理性，即这句话的出现符不符合自然语言的评判标准，通俗点表述就是这是不是句人话。同理，根据链式规则，<code>The fat cat</code>的联合概率可求：</p>
+<p>$$<br>p(The, fat, cat) = p(The)·p(fat|The)·p(cat|The, fat)<br>$$</p>
+<p>在知道前面的词为<code>The cat</code>的情况下，下一个词为<code>cat</code>的概率可以推导出来：</p>
+<p>$$<br>p(cat|The, fat) = \frac{p(The, fat, cat)}{p(The, fat)}<br>$$</p>
+<p>分子是<code>The fat cat</code>在语料库中出现的次数，分母是<code>The fat</code>在语料库中出现的次数。</p>
+<p>因此，<code>The fat cat sat on the mat</code>整个句子的合理性同样可以推导，这个句子的合理性即为它的概率。公式化的描述如下：</p>
+<p>$$<br>p(S) = p(w_1, w_2, ···, w_n) =  p(w_1)·p(w_2|w_1)·p(w_3|w_1, w_2)···p(w_n|w_1, w_2, w_3, ···, w_n-1)<br>$$</p>
+<blockquote>
+<p>（公式后的n-1应该为下标，插件问题，下同）</p>
+</blockquote>
+<p>可以看出一个问题，每当计算下一个词的条件概率，需要计算前面所有词的联合概率。这个计算量相当的庞大。并且，一个句子中大部分词同时出现的概率往往少之又少，数据稀疏非常严重，需要一个非常大的语料库来训练。</p>
+<p>一个简单的优化是基于马尔科夫假设，下一个词的出现仅与前面的一个或n个词有关。</p>
+<p>最简单的情况，下一个词的出现仅仅和前面一个词有关，称之为bigram。</p>
+<p>$$<br>p(S) = p(w_1, w_2, ···, w_n) =  p(w_1)·p(w_2|w_1)·p(w_3|w_2)·p(w_4|w_3)···p(w_n|w_n-1)<br>$$</p>
+<p>再复杂点，下一个词的出现仅和前面两个词有关，称之为trigram。</p>
+<p>$$<br>p(S) = p(w_1, w_2, ···, w_n) =  p(w_1)·p(w_2|w_1)·p(w_3|w_1, w_2)·p(w_4|w_2, w_3)···p(w_n|w_n-2, w_n-1)<br>$$</p>
+<p>这样的条件概率虽然好求，但是会丢失大量的前面的词的信息，有时会对结果产生不良影响。因此如何选择一个有效的n，使得既能简化计算，又能保留大部分的上下文信息。</p>
+<p>以上均是传统语言模型的描述。如果不太深究细节，我们的任务就是，知道前面n个词，来计算下一个词出现的概率。并且使用语言模型来生成新的文本。</p>
+<p>在本文中，我们更加关注的是，如何使用RNN来推测下一个词。</p>
+<h3 id="数据准备"><a href="#数据准备" class="headerlink" title="数据准备"></a>数据准备</h3><p>TensorFlow的官方文档使用的是Mikolov准备好的PTB数据集。我们可以将其下载并解压出来：</p>
+<pre><code class="bash">$ wget http://www.fit.vutbr.cz/~imikolov/rnnlm/simple-examples.tgz
+$ tar xvf simple-examples.tgz
+</code></pre>
+<p>部分数据如下，不常用的词转换成了<code>&lt;unk&gt;</code>标记，数字转换成了N：</p>
+<pre><code>we &#39;re talking about years ago before anyone heard of asbestos having any questionable properties
+there is no asbestos in our products now
+neither &lt;unk&gt; nor the researchers who studied the workers were aware of any research on smokers of the kent cigarettes
+we have no useful information on whether users are at risk said james a. &lt;unk&gt; of boston &#39;s &lt;unk&gt; cancer institute
+the total of N deaths from malignant &lt;unk&gt; lung cancer and &lt;unk&gt; was far higher than expected the researchers said
+</code></pre><p>读取文件中的数据，将换行符转换为<code>&lt;eos&gt;</code>，然后转换为词的list：</p>
+<pre><code class="python">def _read_words(filename):
+    with open(filename, &#39;r&#39;, encoding=&#39;utf-8&#39;) as f:
+        return f.read().replace(&#39;\n&#39;, &#39;&lt;eos&gt;&#39;).split()
+</code></pre>
+<pre><code class="python">f = _read_words(&#39;simple-examples/data/ptb.train.txt&#39;)
+print(f[:20])
+</code></pre>
+<p>得到：</p>
+<pre><code class="python">[&#39;aer&#39;, &#39;banknote&#39;, &#39;berlitz&#39;, &#39;calloway&#39;, &#39;centrust&#39;, &#39;cluett&#39;, &#39;fromstein&#39;, &#39;gitano&#39;, &#39;guterman&#39;, &#39;hydro-quebec&#39;, &#39;ipo&#39;, &#39;kia&#39;, &#39;memotec&#39;, &#39;mlx&#39;, &#39;nahb&#39;, &#39;punts&#39;, &#39;rake&#39;, &#39;regatta&#39;, &#39;rubens&#39;, &#39;sim&#39;]
+</code></pre>
+<p>构建词汇表，词与id互转：</p>
+<pre><code class="python">def _build_vocab(filename):
+    data = _read_words(filename)
+
+    counter = Counter(data)
+    count_pairs = sorted(counter.items(), key=lambda x: -x[1])
+
+    words, _ = list(zip(*count_pairs))
+    word_to_id = dict(zip(words, range(len(words))))
+
+    return words, word_to_id
+</code></pre>
+<pre><code class="python">words, words_to_id = _build_vocab(&#39;simple-examples/data/ptb.train.txt&#39;)
+print(words[:10])
+print(list(map(lambda x: words_to_id[x], words[:10])))
+</code></pre>
+<p>输出：</p>
+<pre><code class="python">(&#39;the&#39;, &#39;&lt;unk&gt;&#39;, &#39;&lt;eos&gt;&#39;, &#39;N&#39;, &#39;of&#39;, &#39;to&#39;, &#39;a&#39;, &#39;in&#39;, &#39;and&#39;, &quot;&#39;s&quot;)
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+</code></pre>
+<p>将一个文件转换为id表示：</p>
+<pre><code class="python">def _file_to_word_ids(filename, word_to_id):
+    data = _read_words(filename)
+    return [word_to_id[x] for x in data if x in word_to_id]
+</code></pre>
+<pre><code class="python">words_in_file = _file_to_word_ids(&#39;simple-examples/data/ptb.train.txt&#39;, words_to_id)
+print(words_in_file[:20])
+</code></pre>
+<p>词汇表已根据词频进行排序，由于第一句话非英文，所以id靠后。</p>
+<pre><code class="python">[9980, 9988, 9981, 9989, 9970, 9998, 9971, 9979, 9992, 9997, 9982, 9972, 9993, 9991, 9978, 9983, 9974, 9986, 9999, 9990]
+</code></pre>
+<p>将一句话从id列表转换回词：</p>
+<pre><code class="python">def to_words(sentence, words):
+    return list(map(lambda x: words[x], sentence))
+</code></pre>
+<p>将以上函数整合：</p>
+<pre><code class="python">def ptb_raw_data(data_path=None):
+    train_path = os.path.join(data_path, &#39;ptb.train.txt&#39;)
+    valid_path = os.path.join(data_path, &#39;ptb.valid.txt&#39;)
+    test_path = os.path.join(data_path, &#39;ptb.test.txt&#39;)
+
+    words, word_to_id = _build_vocab(train_path)
+    train_data = _file_to_word_ids(train_path, word_to_id)
+    valid_data = _file_to_word_ids(valid_path, word_to_id)
+    test_data = _file_to_word_ids(test_path, word_to_id)
+
+    return train_data, valid_data, test_data, words, word_to_id
+</code></pre>
+<p>以上部分和官方的例子有一定的相似之处。接下来的处理和官方存在很大的不同，主要参考了Keras例程处理文档的操作：</p>
+<pre><code class="python">def ptb_producer(raw_data, batch_size=64, num_steps=20, stride=1):
+    data_len = len(raw_data)
+
+    sentences = []
+    next_words = []
+    for i in range(0, data_len - num_steps, stride):
+        sentences.append(raw_data[i:(i + num_steps)])
+        next_words.append(raw_data[i + num_steps])
+
+    sentences = np.array(sentences)
+    next_words = np.array(next_words)
+
+    batch_len = len(sentences) // batch_size
+    x = np.reshape(sentences[:(batch_len * batch_size)], \
+        [batch_len, batch_size, -1])
+
+    y = np.reshape(next_words[:(batch_len * batch_size)], \
+        [batch_len, batch_size])
+
+    return x, y
+</code></pre>
+<p>参数解析：</p>
+<ul>
+<li>raw_data: 即<code>ptb_raw_data()</code>函数产生的数据</li>
+<li>batch_size: 神经网络使用随机梯度下降，数据按多个批次输出，此为每个批次的数据量</li>
+<li>num_steps: 每个句子的长度，相当于之前描述的n的大小，这在循环神经网络中又称为时序的长度。</li>
+<li>stride: 取数据的步长，决定数据量的大小。</li>
+</ul>
+<p>代码解析：</p>
+<p>这个函数将一个原始数据list转换为多个批次的数据，即<code>[batch_len, batch_size, num_steps]</code>。</p>
+<p>首先，程序每一次取了<code>num_steps</code>个词作为一个句子，即x，以这<code>num_steps</code>个词后面的一个词作为它的下一个预测，即为y。这样，我们首先把原始数据整理成了<code>batch_len * batch_size</code>个x和y的表示，类似于已知x求y的分类问题。</p>
+<p>为了满足随机梯度下降的需要，我们还需要把数据整理成一个个小的批次，每次喂一个批次的数据给TensorFlow来更新权重，这样，数据就整理为<code>[batch_len, batch_size, num_steps]</code>的格式。</p>
+<p>打印部分数据：</p>
+<pre><code class="python">train_data, valid_data, test_data, words, word_to_id = ptb_raw_data(&#39;simple-examples/data&#39;)
+x_train, y_train = ptb_producer(train_data)
+print(x_train.shape)
+print(y_train.shape)
+</code></pre>
+<p>输出：</p>
+<pre><code>(14524, 64, 20)
+(14524, 64)
+</code></pre><p>可见我们得到了14524个批次的数据，每个批次的训练集维度为[64, 20]。</p>
+<pre><code class="python">print(&#39; &#39;.join(to_words(x_train[100, 3], words)))
+</code></pre>
+<p>第100个批次的第3句话为：</p>
+<pre><code>despite steady sales growth &lt;eos&gt; magna recently cut its quarterly dividend in half and the company &#39;s class a shares
+</code></pre><pre><code class="python">print(words[np.argmax(y_train[100, 3])])
+</code></pre>
+<p>它的下一个词为：</p>
+<pre><code>the
+</code></pre><h3 id="构建模型"><a href="#构建模型" class="headerlink" title="构建模型"></a>构建模型</h3><h4 id="配置项"><a href="#配置项" class="headerlink" title="配置项"></a>配置项</h4><pre><code class="python">class LMConfig(object):
+    &quot;&quot;&quot;language model 配置项&quot;&quot;&quot;
+    batch_size = 64       # 每一批数据的大小
+    num_steps = 20        # 每一个句子的长度
+    stride = 3            # 取数据时的步长
+
+    embedding_dim = 64    # 词向量维度
+    hidden_dim = 128      # RNN隐藏层维度
+    num_layers = 2        # RNN层数
+
+    learning_rate = 0.05  # 学习率
+    dropout = 0.2         # 每一层后的丢弃概率
+</code></pre>
+<h4 id="读取输入"><a href="#读取输入" class="headerlink" title="读取输入"></a>读取输入</h4><p>让模型可以按批次的读取数据。</p>
+<pre><code class="python">class PTBInput(object):
+    &quot;&quot;&quot;按批次读取数据&quot;&quot;&quot;
+    def __init__(self, config, data):
+        self.batch_size = config.batch_size
+        self.num_steps = config.num_steps
+        self.vocab_size = config.vocab_size # 词汇表大小
+
+        self.input_data, self.targets = ptb_producer(data,
+            self.batch_size, self.num_steps)
+
+        self.batch_len = self.input_data.shape[0] # 总批次
+        self.cur_batch = 0  # 当前批次
+
+    def next_batch(self):
+        &quot;&quot;&quot;读取下一批次&quot;&quot;&quot;
+        x = self.input_data[self.cur_batch]
+        y = self.targets[self.cur_batch]
+
+        # 转换为one-hot编码
+        y_ = np.zeros((y.shape[0], self.vocab_size), dtype=np.bool)
+        for i in range(y.shape[0]):
+            y_[i][y[i]] = 1
+
+        # 如果到最后一个批次，则回到最开头
+        self.cur_batch = (self.cur_batch +1) % self.batch_len
+
+        return x, y_
+</code></pre>
+<h4 id="模型"><a href="#模型" class="headerlink" title="模型"></a>模型</h4><pre><code class="python">class PTBModel(object):
+    def __init__(self, config, is_training=True):
+
+        self.num_steps = config.num_steps
+        self.vocab_size = config.vocab_size
+
+        self.embedding_dim = config.embedding_dim
+        self.hidden_dim = config.hidden_dim
+        self.num_layers = config.num_layers
+        self.rnn_model = config.rnn_model
+
+        self.learning_rate = config.learning_rate
+        self.dropout = config.dropout
+
+        self.placeholders()  # 输入占位符
+        self.rnn()           # rnn 模型构建
+        self.cost()          # 代价函数
+        self.optimize()      # 优化器
+        self.error()         # 错误率
+
+
+    def placeholders(self):
+        &quot;&quot;&quot;输入数据的占位符&quot;&quot;&quot;
+        self._inputs = tf.placeholder(tf.int32, [None, self.num_steps])
+        self._targets = tf.placeholder(tf.int32, [None, self.vocab_size])
+
+
+    def input_embedding(self):
+        &quot;&quot;&quot;将输入转换为词向量表示&quot;&quot;&quot;
+        with tf.device(&quot;/cpu:0&quot;):
+            embedding = tf.get_variable(
+                &quot;embedding&quot;, [self.vocab_size,
+                    self.embedding_dim], dtype=tf.float32)
+            _inputs = tf.nn.embedding_lookup(embedding, self._inputs)
+
+        return _inputs
+
+
+    def rnn(self):
+        &quot;&quot;&quot;rnn模型构建&quot;&quot;&quot;
+        def lstm_cell():  # 基本的lstm cell
+            return tf.contrib.rnn.BasicLSTMCell(self.hidden_dim,
+                state_is_tuple=True)
+
+        def gru_cell():   # gru cell，速度更快
+            return tf.contrib.rnn.GRUCell(self.hidden_dim)
+
+        def dropout_cell():    # 在每个cell后添加dropout
+            if (self.rnn_model == &#39;lstm&#39;):
+                cell = lstm_cell()
+            else:
+                cell = gru_cell()
+            return tf.contrib.rnn.DropoutWrapper(cell,
+                output_keep_prob=self.dropout)
+
+        cells = [dropout_cell() for _ in range(self.num_layers)]
+        cell = tf.contrib.rnn.MultiRNNCell(cells, state_is_tuple=True)  # 多层rnn
+
+        _inputs = self.input_embedding()
+        _outputs, _ = tf.nn.dynamic_rnn(cell=cell,
+            inputs=_inputs, dtype=tf.float32)
+
+        # _outputs的shape为 [batch_size, num_steps, hidden_dim]
+        last = _outputs[:, -1, :]  # 只需要最后一个输出
+
+        # dense 和 softmax 用于分类，以找出各词的概率
+        logits = tf.layers.dense(inputs=last, units=self.vocab_size)   
+        prediction = tf.nn.softmax(logits)  
+
+        self._logits = logits
+        self._pred = prediction
+
+    def cost(self):
+        &quot;&quot;&quot;计算交叉熵代价函数&quot;&quot;&quot;
+        cross_entropy = tf.nn.softmax_cross_entropy_with_logits(
+            logits=self._logits, labels=self._targets)
+        cost = tf.reduce_mean(cross_entropy)
+        self.cost = cost
+
+    def optimize(self):
+        &quot;&quot;&quot;使用adam优化器&quot;&quot;&quot;
+        optimizer = tf.train.AdamOptimizer(learning_rate=self.learning_rate)
+        self.optim = optimizer.minimize(self.cost)
+
+    def error(self):
+        &quot;&quot;&quot;计算错误率&quot;&quot;&quot;
+        mistakes = tf.not_equal(
+            tf.argmax(self._targets, 1), tf.argmax(self._pred, 1))
+        self.errors = tf.reduce_mean(tf.cast(mistakes, tf.float32))
+</code></pre>
+<h4 id="训练"><a href="#训练" class="headerlink" title="训练"></a>训练</h4><pre><code class="python">def run_epoch(num_epochs=10):
+    config = LMConfig()   # 载入配置项
+
+    # 载入源数据，这里只需要训练集
+    train_data, _, _, words, word_to_id = \
+        ptb_raw_data(&#39;simple-examples/data&#39;)
+    config.vocab_size = len(words)
+
+    # 数据分批
+    input_train = PTBInput(config, train_data)
+    batch_len = input_train.batch_len
+
+    # 构建模型
+    model = PTBModel(config)
+
+    # 创建session，初始化变量
+    sess = tf.Session()
+    sess.run(tf.global_variables_initializer())
+
+    print(&#39;Start training...&#39;)
+    for epoch in range(num_epochs):  # 迭代轮次
+        for i in range(batch_len):   # 经过多少个batch
+            x_batch, y_batch = input_train.next_batch()
+
+            # 取一个批次的数据，运行优化
+            feed_dict = {model._inputs: x_batch, model._targets: y_batch}
+            sess.run(model.optim, feed_dict=feed_dict)
+
+            # 每500个batch，输出一次中间结果
+            if i % 500 == 0:
+                cost = sess.run(model.cost, feed_dict=feed_dict)
+
+                msg = &quot;Epoch: {0:&gt;3}, batch: {1:&gt;6}, Loss: {2:&gt;6.3}&quot;
+                print(msg.format(epoch + 1, i + 1, cost))
+
+                # 输出部分预测结果
+                pred = sess.run(model._pred, feed_dict=feed_dict)
+                word_ids = sess.run(tf.argmax(pred, 1))
+                print(&#39;Predicted:&#39;, &#39; &#39;.join(words[w] for w in word_ids))
+                true_ids = np.argmax(y_batch, 1)
+                print(&#39;True:&#39;, &#39; &#39;.join(words[w] for w in true_ids))
+
+    print(&#39;Finish training...&#39;)
+    sess.close()
+</code></pre>
+<p>需要经过多次的训练才能得到一个较为合理的结果。</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2017-08-24</span><i class="fa fa-tag"></i><a href="/categories/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a><a href="/tags/Language-Model/" title="Language Model" class="tag">Language Model </a><a href="/tags/TensorFlow/" title="TensorFlow" class="tag">TensorFlow </a><a href="/tags/RNN/" title="RNN" class="tag">RNN </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2017/08/24/tensorflow-language-model/,夜露,使用TensorFlow训练循环神经网络语言模型,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2017/08/30/text-classification-tensorflow/" title="CNN与RNN中文文本分类-基于TensorFlow实现" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2017/08/16/tensorflow-tensorboard/" title="TensorFlow - TensorBoard可视化" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config("");
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end --></body></html>

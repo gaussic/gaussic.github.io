@@ -1,0 +1,301 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>TensorFlow - 线性模型 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="本章主要通过线性模型介绍TensorFlow的一些基本使用流程。
+
+这是几篇与原作不完全相同的教程，转载请说明出处：Gaussic
+原作者：Magnus Erik Hvass Pedersen  / GitHub / Videos on YouTube
+需要导入的包import tensorflow"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>TensorFlow - 线性模型</a></h3></div><div class="post-content"><blockquote>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>本章主要通过线性模型介绍TensorFlow的一些基本使用流程。</p>
+</blockquote>
+<p>这是几篇与原作不完全相同的教程，转载请说明出处：<a href="https://gaussic.github.io/">Gaussic</a></p>
+<p>原作者：<a href="http://www.hvass-labs.org/" target="_blank" rel="noopener">Magnus Erik Hvass Pedersen</a>  / <a href="https://github.com/Hvass-Labs/TensorFlow-Tutorials" target="_blank" rel="noopener">GitHub</a> / <a href="https://www.youtube.com/playlist?list=PL9Hr9sNUjfsmEu1ZniY0XpHSzl5uihcXZ" target="_blank" rel="noopener">Videos on YouTube</a></p>
+<h3 id="需要导入的包"><a href="#需要导入的包" class="headerlink" title="需要导入的包"></a>需要导入的包</h3><pre><code class="python">import tensorflow as tf          # TensorFlow
+import matplotlib.pyplot as plt  # matplotlib绘图
+import numpy as np               # Numpy
+from sklearn.metrics import confusion_matrix    # 混淆矩阵，分析模型误差
+
+# notebook使用
+%matplotlib inline
+</code></pre>
+<h3 id="载入数据"><a href="#载入数据" class="headerlink" title="载入数据"></a>载入数据</h3><p>TensorFlow在样例教程中已经做了下载并导入MNIST数字手写体识别数据集的实现，可以直接使用。以下代码会将MNIST数据集下载到<code>data/MNIST</code>目录下，将标签保存为<code>one-hot</code>编码。</p>
+<pre><code class="python">from tensorflow.examples.tutorials.mnist import input_data
+mnist = input_data.read_data_sets(&#39;data/MNIST&#39;, one_hot=True)
+</code></pre>
+<p>MNIST数据集总共有70000张手写数字图片，数据集被分为训练集、测试集和验证集三部分。</p>
+<pre><code class="python">print(&quot;数据集大小：&quot;)
+print(&#39;- 训练集：{}&#39;.format(len(data.train.labels)))
+print(&#39;- 测试集：{}&#39;.format(len(data.test.labels)))
+print(&#39;- 验证集：{}&#39;.format(len(data.validation.labels)))
+</code></pre>
+<pre><code class="python">数据集大小：
+- 训练集：55000
+- 测试集：10000
+- 验证集：5000
+</code></pre>
+<h4 id="One-hot编码"><a href="#One-hot编码" class="headerlink" title="One-hot编码"></a>One-hot编码</h4><p>每一张图的标签使用了<code>one-hot</code>编码保存在numpy矩阵中，而不是原本的类别，这是为了方便神经网络的处理。</p>
+<pre><code class="python">print(data.test.labels[:5])
+</code></pre>
+<pre><code class="python">[[ 0.  0.  0.  0.  0.  0.  0.  1.  0.  0.]
+ [ 0.  0.  1.  0.  0.  0.  0.  0.  0.  0.]
+ [ 0.  1.  0.  0.  0.  0.  0.  0.  0.  0.]
+ [ 1.  0.  0.  0.  0.  0.  0.  0.  0.  0.]
+ [ 0.  0.  0.  0.  1.  0.  0.  0.  0.  0.]]
+</code></pre>
+<p>在<code>one-hot</code>编码中，只有对应类别的那个位置为1，其余都为0，我们可以使用以下代码将其转换为真实类别：</p>
+<pre><code class="python">data.test.cls = np.argmax(data.test.labels, axis=1)
+print(data.test.cls[:5])
+</code></pre>
+<pre><code class="python">[7 2 1 0 4]
+</code></pre>
+<h4 id="数据维度"><a href="#数据维度" class="headerlink" title="数据维度"></a>数据维度</h4><p>在MNIST数据集中，原始的28*28像素的黑白图片被展平为784维的向量。</p>
+<pre><code class="python">print(&quot;样本维度：&quot;, data.train.images.shape)
+print(&quot;标签维度：&quot;, data.train.labels.shape)
+</code></pre>
+<pre><code class="python">样本维度： (55000, 784)
+标签维度： (55000, 10)
+</code></pre>
+<p>为使得网络结构更加清晰，在这里对这些固定维度做如下定义：</p>
+<pre><code class="python">img_size = 28                        # 图片的高度和宽度
+img_size_flat = img_size * img_size  # 展平为向量的尺寸
+img_shape = (img_size, img_size)     # 图片的二维尺寸
+
+num_classes = 10                     # 类别数目
+</code></pre>
+<h4 id="打印部分样例图片"><a href="#打印部分样例图片" class="headerlink" title="打印部分样例图片"></a>打印部分样例图片</h4><pre><code class="python">def plot_images(images, cls_true, cls_pred=None):
+    &quot;&quot;&quot;
+    绘制图像，输出真实标签与预测标签
+    images:   图像（9张）
+    cls_true: 真实类别
+    cls_pred: 预测类别
+    &quot;&quot;&quot;
+    assert len(images) == len(cls_true) == 9   # 保证存在9张图片
+
+    fig, axes = plt.subplots(3, 3)   # 创建3x3个子图的画布
+    fig.subplots_adjust(hspace=0.3, wspace=0.3)  # 调整每张图之间的间隔
+
+    for i, ax in enumerate(axes.flat):
+        # 绘图，将一维向量变为二维矩阵，黑白二值图像使用 binary
+        ax.imshow(images[i].reshape(img_shape), cmap=&#39;binary&#39;)
+
+        if cls_pred is None:  # 如果未传入预测类别
+            xlabel = &quot;True: {0}&quot;.format(cls_true[i])
+        else:
+            xlabel = &quot;True: {0}, Pred: {1}&quot;.format(cls_true[i], cls_pred[i])
+        ax.set_xlabel(xlabel)
+
+        # 删除坐标信息
+        ax.set_xticks([])
+        ax.set_yticks([])
+</code></pre>
+<pre><code class="python"># 随机取9张图片
+indices = np.arange(len(data.test.cls))
+np.random.shuffle(indices)
+indices = indices[:9]    
+
+images = data.test.images[indices]
+cls_true = data.test.cls[indices]
+
+plot_images(images, cls_true)
+</code></pre>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_images.png" alt="tensorflow-linear-model/plot_images.png"></p>
+<h3 id="TensorFlow计算图"><a href="#TensorFlow计算图" class="headerlink" title="TensorFlow计算图"></a>TensorFlow计算图</h3><p>TensorFlow使用计算图模型来构建神经网络。其主要流程是先建立好整个网络的计算图模型，然后再导入数据进行计算。</p>
+<p>一个TensorFlow计算图包含以下几个部分：</p>
+<ul>
+<li>Placeholder:       占位符，用来读取用户输入与输出；</li>
+<li>Variable:             模型的变量，也称为参数，在计算过程中逐步优化；</li>
+<li>Model:                使用的神经网络模型，也可以使用一些简单的计算；</li>
+<li>Cost Function： 代价函数，也称损失函数，如何计算模型的误差；</li>
+<li>Optimizer：        优化器，使用哪种优化策略来降低损失。</li>
+</ul>
+<h4 id="Placeholder占位符"><a href="#Placeholder占位符" class="headerlink" title="Placeholder占位符"></a>Placeholder占位符</h4><p>占位符为输入与输出占据位置，这写输入输出一般在不同的轮次都会有所变化。由于TensorFlow先构图再计算，所以需要使用占位符为输入和输出预留位置。</p>
+<pre><code class="python">x = tf.placeholder(tf.float32, shape=[None, img_size_flat])
+y_true = tf.placeholder(tf.float32, shape=[None, num_classes])
+y_true_cls = tf.placeholder(tf.int64, shape=[None])
+</code></pre>
+<p>在上面的代码中，<code>None</code>表示一次输入多少数据，这一般跟样本的数量和每个批次的数据量<code>batch_size</code>有关。</p>
+<h4 id="Variable变量"><a href="#Variable变量" class="headerlink" title="Variable变量"></a>Variable变量</h4><p>变量是模型的参数，这些参数在模型的计算过程中会被逐步的优化，以使得模型在训练集上有更好的表现。例如在本文的线性模型中，参数有两个：</p>
+<p>$$<br>y = Wx+b<br>$$</p>
+<p>其中的$W$就是模型的权重，$b$就是模型的偏移量，这两个变量会在计算过程中被优化。</p>
+<pre><code class="python">weights = tf.Variable(tf.zeros([img_size_flat, num_classes]))
+biases = tf.Variable(tf.zeros([num_classes]))
+</code></pre>
+<p>需要注意的是，输入的是784维的向量，输出的标签是10维的向量，$W$是输入到输出的映射，因此它的维度为<code>[784, 10]</code>，而$b$是偏移量，因此维度为<code>[10]</code>。我们首先将它们初始化为0，TensorFlow会自动进行调整。</p>
+<h4 id="Model模型"><a href="#Model模型" class="headerlink" title="Model模型"></a>Model模型</h4><p>上面给出了整个模型的公式，因此实现起来非常简单：</p>
+<pre><code class="python">logits = tf.matmul(x, weights) + biases
+</code></pre>
+<p><code>tf.matmul</code>表示矩阵乘法。上式返回的结果是一个 <code>[None, num_classes]</code> 的矩阵。<code>logits</code>是TensorFlow常用术语，这里不去考虑。这个结果离真实的分类还有一定的距离，我们需要使用一个softmax来对其归一化，以使得它的和为1。Softmax函数类似于计算了每一个维度的概率，其中最大的那个概率即对应它的类别。</p>
+<pre><code class="python">y_pred = tf.nn.softmax(logits)
+y_pred_cls = tf.argmax(y_pred, axis=1)
+</code></pre>
+<p>y_pred_cls 的计算与之前使用Numpy计算类别的方式相似，说明TensorFlow的许多操作都和Numpy是相通的。不同的是Numpy的计算是实时的，而TensorFlow只有在运行计算图时才会返回结果。</p>
+<h4 id="Cost-Function代价函数"><a href="#Cost-Function代价函数" class="headerlink" title="Cost Function代价函数"></a>Cost Function代价函数</h4><p>代价函数用来评估模型的错误率。模型的损失越高，说明离真实结果的偏差越大，需要尽可能的减小这个损失，以使得模型尽可能的准确。</p>
+<p>代价函数存在多种的形式，比较常用的是平方误差和交叉熵。在这里使用更常用的交叉熵，有关交叉熵的细节请另外查阅资料。</p>
+<pre><code class="python">cross_entropy = tf.nn.softmax_cross_entropy_with_logits(logits=logits, labels=y_true)
+cost = tf.reduce_mean(cross_entropy)    # 交叉熵平均值即代价
+</code></pre>
+<p>需要注意的是，传入的是计算softmx之前的<code>logits</code>，而非<code>y_pred</code>，这其中的原因是softmax的计算十分耗时，处于速度的考虑，TensorFlow在实现中直接使用logits，然后在<code>tf.nn.softmax_cross_entropy_with_logits</code>内部使用更高效的方法计算交叉熵，具体的原理仍然是一样的。</p>
+<p>在计算完总的交叉熵是，其均值即为代价。</p>
+<h4 id="Optimization优化"><a href="#Optimization优化" class="headerlink" title="Optimization优化"></a>Optimization优化</h4><p>现在我们已经有了代价函数的度量方法，接下来就需要使用优化器来优化这个代价函数。常用的做法是使用提督下降将来传播误差，然后在更新权重。TensorFlow提供了多种计算梯度的<a href="https://www.tensorflow.org/api_guides/python/train#Optimizers" target="_blank" rel="noopener">优化器</a>，如果在一个优化器的效果不明显时，可以尝试使用另一个优化器。这里使用基本的<code>GradientDescentOptimizer</code>，学习率为0.5，学习率越低收敛越快，学习率过高可能会导致不收敛。</p>
+<pre><code class="python">optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.5).minimize(cost)
+</code></pre>
+<h4 id="性能度量"><a href="#性能度量" class="headerlink" title="性能度量"></a>性能度量</h4><p>一般来说，以上的代码就已经完成了模型的构建。但是为了评估模型的性能，还需要一些其他的代码。最直观的是模型的准确率。</p>
+<pre><code class="python">correct_prediction = tf.equal(y_pred_cls, y_true_cls)  # 判断相等的元素
+accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))  # 计算准确率
+</code></pre>
+<h3 id="运行TensorFlow计算图"><a href="#运行TensorFlow计算图" class="headerlink" title="运行TensorFlow计算图"></a>运行TensorFlow计算图</h3><h4 id="创建Session以及变量初始化"><a href="#创建Session以及变量初始化" class="headerlink" title="创建Session以及变量初始化"></a>创建Session以及变量初始化</h4><p>TensorFlow计算图运行在一个session中，计算之前需要先创建这个session，并初始化其中的一些变量（w 和 b），TensorFlow使用<code>session.run()</code>来运行计算图。</p>
+<pre><code class="python">session = tf.Session()   # 创建session
+session.run(tf.global_variables_initializer())   # 变量初始化
+</code></pre>
+<h4 id="执行优化的帮助函数"><a href="#执行优化的帮助函数" class="headerlink" title="执行优化的帮助函数"></a>执行优化的帮助函数</h4><p>在训练集中有55000张图片，如果在每一轮迭代过程中都使用全部的图像作为输入的话，计算时间太长。因此使用小批量的随即梯度下降方法来执行每一次优化。梯度下降过程会自动的优化权重$W$和偏置$b$。</p>
+<pre><code class="python">batch_size = 100   # 每一轮的数据量
+def optimize(num_iterations):   
+    for i in range(num_iterations):   # 迭代轮数
+        # TensorFlow自己实现了取MNIST下一个批次的操作，这里直接使用，不必深究
+        x_batch, y_true_batch = data.train.next_batch(batch_size)
+
+        # 把这批数据放在要喂入模型的dict里面
+        feed_dict_train = {x: x_batch, y_true: y_true_batch}
+
+        # 运行优化器，喂入数据
+        session.run(optimizer, feed_dict=feed_dict_train)
+</code></pre>
+<h4 id="评估性能的帮助函数"><a href="#评估性能的帮助函数" class="headerlink" title="评估性能的帮助函数"></a>评估性能的帮助函数</h4><p>现在需要评估模型在测试数据上的性能，需要将测试数据整个喂入模型中：</p>
+<pre><code class="python">feed_dict_test = {x: data.test.images,
+                  y_true: data.test.labels,
+                  y_true_cls: data.test.cls}
+</code></pre>
+<p>输出准确率：</p>
+<pre><code class="python">def print_accuracy():
+    # 运行accuracy来计算acc
+    acc = session.run(accuracy, feed_dict=feed_dict_test)
+    print(&quot;测试集准确率: {0:.1%}&quot;.format(acc))   # 保留1位小数
+</code></pre>
+<p>输出混淆矩阵：</p>
+<pre><code class="python">def print_confusion_matrix():
+    cls_true = data.test.cls   # 真实类别
+    # 运行y_pred_cls计算出的真实类别
+    cls_pred = session.run(y_pred_cls, feed_dict=feed_dict_test)
+
+    # 使用scikit-learn的confusion_matrix来计算混淆矩阵
+    cm = confusion_matrix(y_true=cls_true, y_pred=cls_pred)
+
+    # 打印混淆矩阵
+    print(cm)
+
+    # 将混淆矩阵输出为图像
+    plt.imshow(cm, interpolation=&#39;nearest&#39;, cmap=plt.cm.Blues)
+
+    # 调整图像
+    plt.tight_layout()
+    plt.colorbar()
+    tick_marks = np.arange(num_classes)
+    plt.xticks(tick_marks, range(num_classes))
+    plt.yticks(tick_marks, range(num_classes))
+    plt.xlabel(&#39;Predicted&#39;)
+    plt.ylabel(&#39;True&#39;)
+</code></pre>
+<p>输出部分错误样例</p>
+<pre><code class="python">def plot_example_errors():
+    # 运行计算图，得到争取情况和预测结果
+    correct, cls_pred = session.run([correct_prediction, y_pred_cls],
+                                    feed_dict=feed_dict_test)
+    # 计算错误情况
+    incorrect = (correct == False)
+    images = data.test.images[incorrect]
+    cls_pred = cls_pred[incorrect]
+    cls_true = data.test.cls[incorrect]
+
+    # 随机挑选9个
+    indices = np.arange(len(images))
+    np.random.shuffle(indices)
+    indices = indices[:9]
+
+    plot_images(images[indices], cls_true[indices], cls_pred[indices])
+</code></pre>
+<h4 id="优化前的性能"><a href="#优化前的性能" class="headerlink" title="优化前的性能"></a>优化前的性能</h4><p>准确率：</p>
+<pre><code class="python">print_accuracy()
+</code></pre>
+<p>输出：</p>
+<pre><code>测试集准确率: 9.8%
+</code></pre><p>在未进行训练是，测试集的准确率为9.8%，因为$W$和$b$全都被初始化为0，因此所有的预测结果均为0。</p>
+<p>部分错误样例：</p>
+<pre><code class="python">plot_example_errors()
+</code></pre>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_example_errors.png" alt="tensorflow-linear-model/plot_example_errors.png"></p>
+<p>这也证明了上面的说法。</p>
+<h4 id="一轮迭代后的性能"><a href="#一轮迭代后的性能" class="headerlink" title="一轮迭代后的性能"></a>一轮迭代后的性能</h4><pre><code class="python">optimize(num_iterations=1)
+print_accuracy()
+</code></pre>
+<pre><code>测试集准确率: 26.7%
+</code></pre><p>尝试一轮迭代后，准确率提升到了26.7%。</p>
+<pre><code class="python">plot_example_errors()
+</code></pre>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_example_errors2.png" alt="tensorflow-linear-model/plot_example_errors2.png"></p>
+<p>预测结果也有了一定的变化。</p>
+<p>最重要的是各个类别的权重情况：</p>
+<pre><code class="python">plot_weights()
+</code></pre>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_weights.png" alt="tensorflow-linear-model/plot_weights.png"></p>
+<p>在上图中，蓝色部分的权重为负数，红色部分的权重为正数，这些权重可以看作图片的过滤器。可以看到，模型的权重偏向于数字所在的位置。对于0和1，由于数字比较简单，模型可以很好的识别，而对于其他的数字，模型在识别上有一定的难度，需要更多次的优化。</p>
+<h4 id="10轮迭代后的性能"><a href="#10轮迭代后的性能" class="headerlink" title="10轮迭代后的性能"></a>10轮迭代后的性能</h4><pre><code class="python">optimize(num_iterations=9)   # 之前已经做过一轮
+print_accuracy()
+</code></pre>
+<pre><code class="python">测试集准确率: 81.0%
+</code></pre>
+<p>测试集的准确率达到了81.0%，这是一个非常大的进步。再看看部分的错误样例：</p>
+<pre><code class="python">plot_example_errors()
+</code></pre>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_example_errors3.png" alt="tensorflow-linear-model/plot_example_errors3.png"></p>
+<p>可以发现，图片的预测结果和真实类别存在一定的相似之处。例如4和9，5和3，模型暂时还无法作出准确的判断。</p>
+<p>接下来再看看权重的情况：</p>
+<pre><code class="python">plot_weights()
+</code></pre>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_weights2.png" alt="tensorflow-linear-model/plot_weights2.png"></p>
+<p>我们发现，图像的红色区域变得更加明显，它们是类别中所有图像的共有属性。对于部分类别（如4，5，9）还存在一定的提升空间。</p>
+<h4 id="100轮迭代后的性能"><a href="#100轮迭代后的性能" class="headerlink" title="100轮迭代后的性能"></a>100轮迭代后的性能</h4><pre><code class="python">optimize(num_iterations=990)   # 之前已经做过10轮
+print_accuracy()
+</code></pre>
+<pre><code class="python">测试集准确率: 91.9%
+</code></pre>
+<p>这个结果已经非常好了。再来看看一些分错的样本：</p>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_example_errors4.png" alt="tensorflow-linear-model/plot_example_errors4.png"></p>
+<p>多尝试几次就会发现，部分的样本是在太过抽象，4和6有时候甚至连人都很难分清。因而这样的一个结果应该合情合理。</p>
+<p>再来看一下权重：</p>
+<p><img src="/2017/08/11/tensorflow-linear-model/plot_weights3.png" alt="tensorflow-linear-model/plot_weights3.png"></p>
+<p>由于训练集的变化多端，为了覆盖多种变化，各类的权重变得有些宽泛，但是焦点仍然在类别中图像的共同之处。</p>
+<p>我们再来看看混淆矩阵的情况：</p>
+<pre><code class="python">print_confusion_matrix()
+</code></pre>
+<pre><code class="python">[[ 957    0    1    2    0    4   12    2    2    0]
+ [   0 1108    2    2    0    3    4    1   15    0]
+ [   6    7  922   20    5    3   19   11   32    7]
+ [   3    0   16  938    0   21    4    9   13    6]
+ [   2    1    6    3  897    1   22    2   10   38]
+ [   9    3    6   50    7  762   19    5   24    7]
+ [   9    3    3    2    6   12  921    1    1    0]
+ [   2   12   24   10    6    2    0  933    2   37]
+ [   7    6    7   38    9   32   16    8  844    7]
+ [  10    6    1   13   34    8    1   14    9  913]]
+</code></pre>
+<p>对角线上为分类正确的情况，其他为一个类分成其他类的情况。将这个矩阵图像化：</p>
+<p><img src="/2017/08/11/tensorflow-linear-model/confmat.png" alt="tensorflow-linear-model/confmat.png"></p>
+<p>可以发现，大部分的分类均正确，少部分的淡蓝色区域说明存在一定的误分类情况。</p>
+<p>在运行完整个计算图后，需要将它关闭，否则将一直占用资源:</p>
+<pre><code class="python">session.close()
+</code></pre>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2017-08-11</span><i class="fa fa-tag"></i><a href="/categories/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a><a href="/tags/TensorFlow/" title="TensorFlow" class="tag">TensorFlow </a><a href="/tags/Tutorial/" title="Tutorial" class="tag">Tutorial </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2017/08/11/tensorflow-linear-model/,夜露,TensorFlow - 线性模型,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2017/08/14/tensorflow-cnn/" title="TensorFlow - 卷积神经网络" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2017/08/08/tf-idf-generation/" title="TF-IDF关键词提取实现" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config("");
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end --></body></html>

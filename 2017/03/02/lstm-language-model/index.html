@@ -1,0 +1,116 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>基于LSTM的语言模型 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="转载请注明出处：https://gaussic.github.io
+基于Keras的LSTM_text_generation的例子，实现中文的语言模型。
+代码在这里：Github fancywriter
+原先的例子是字符级别的，使用了尼采的作品作为训练集，总的词汇只有57个，因而整个网络相对简单，且"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>基于LSTM的语言模型</a></h3></div><div class="post-content"><p>转载请注明出处：<a href="https://gaussic.github.io">https://gaussic.github.io</a></p>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>基于Keras的<a href="https://github.com/fchollet/keras/blob/master/examples/lstm_text_generation.py" target="_blank" rel="noopener">LSTM_text_generation</a>的例子，实现中文的语言模型。</p>
+<p>代码在这里：<a href="https://github.com/gaussic/fancywriter/blob/master/language-model-keras.ipynb" target="_blank" rel="noopener">Github fancywriter</a></p>
+<p>原先的例子是字符级别的，使用了尼采的作品作为训练集，总的词汇只有57个，因而整个网络相对简单，且训练起来速度比较快。</p>
+<p>但是使用中文训练，且加大训练集大小时，词汇表明显增大。使用整本《三国演义》词汇表大小为4001，经过处理之后，序列数量为201260，如果按照序列长度为20，使用原先的<code>one-hot</code>表示的话，那么整个训练集的矩阵大小为 <code>201260*20*4001</code>，严重影响了矩阵运算速度，因此中间加了一个Embedding层，整个网络结构如下：</p>
+<p><img src="/2017/03/02/lstm-language-model/model-visualization.png" alt="model-visualization"></p>
+<h4 id="预处理"><a href="#预处理" class="headerlink" title="预处理"></a>预处理</h4><p>整个的数据需要经过预处理之后，才能使用到网络中：</p>
+<pre><code class="python">def load_data(self, path):
+    # read the entire text
+    text = open(path).read().strip().replace(&#39;\u3000&#39;, &#39;&#39;).replace(&#39;\n&#39;, &#39;&#39;)
+    print(&#39;corpus length:&#39;, len(text))
+
+    # all the vocabularies
+    vocab = sorted(list(set(text)))
+    print(&#39;total words:&#39;, len(vocab))
+
+    # create word-index dict
+    word_to_index = dict((c, i) for i, c in enumerate(vocab))
+    index_to_word = dict((i, c) for i, c in enumerate(vocab))
+
+    # cut the text into fixed size sequences
+    sentences = []
+    next_words = []
+    for i in range(0, len(text) - self.seq_length, self.step):
+        sentences.append(list(text[i: i+self.seq_length]))
+        next_words.append(text[i+self.seq_length])
+    print(&#39;nb sequences:&#39;, len(sentences))
+
+    # generate training samples
+    X = np.asarray([[word_to_index[w] for w in sent[:]] for sent in sentences])
+    y = np.zeros((len(sentences), len(vocab)))
+    for i, word in enumerate(next_words):
+        y[i, word_to_index[word]] = 1
+</code></pre>
+<p>处理之后，X是序列表示，维度为 <code>(训练集数量, 序列长度)</code>，y是 <code>one-hot</code>向量，维度为<code>(词汇表长度)</code>。</p>
+<h4 id="定义模型"><a href="#定义模型" class="headerlink" title="定义模型"></a>定义模型</h4><pre><code class="python">def load_model(self):
+    # load a Sequential model
+    model = Sequential()
+    model.add(Embedding(len(self.vocab), self.embed_size, input_length=self.seq_length))
+    model.add(LSTM(self.embed_size, input_shape=(self.seq_length, self.embed_size), return_sequences=False))
+    model.add(Dense(len(self.vocab)))
+    model.add(Activation(&#39;softmax&#39;))
+</code></pre>
+<p>首先是Embedding层，把序列转换为词向量表示, <code>batch_size * seq_length</code>被映射为 <code>batch_size * seq_length * embed_size</code>。</p>
+<p>然后是LSTM层，输出结果是序列后面的词，只返回最后的值。</p>
+<p>再使用Dense将期映射为词汇表长度的向量，再连接softmax激活函数，就是最后的y。</p>
+<h4 id="编译与训练"><a href="#编译与训练" class="headerlink" title="编译与训练"></a>编译与训练</h4><pre><code class="python">def compile_model(self, lr=0.01):
+    # compile the model
+    optimizer = RMSprop(lr=lr)
+    self.model.compile(loss=&#39;categorical_crossentropy&#39;, optimizer=optimizer)
+
+def fit_model(self, batch_size=128, nb_epoch=1):
+    # fit the model with trainind data
+    self.model.fit(self.X, self.y, batch_size, nb_epoch)
+</code></pre>
+<p>优化器选择<code>RMSprop</code>，损失函数为<code>category_crossentropy</code>。训练时<code>batch_size</code>默认为128，轮次默认为1。</p>
+<h4 id="生成"><a href="#生成" class="headerlink" title="生成"></a>生成</h4><pre><code class="python">def _sample(self, preds, diversity=1.0):
+    # sample from te given prediction
+    preds = np.asarray(preds).astype(&#39;float64&#39;)
+    preds = np.log(preds) / diversity
+    exp_preds = np.exp(preds)
+    preds = exp_preds / np.sum(exp_preds)
+    probas = np.random.multinomial(1, preds, 1)
+
+    return np.argmax(probas)
+
+def generate_text(self):
+    # generate text from randon text seed
+    start_index = random.randint(0, len(self.text) - self.seq_length - 1)
+
+    for diversity in [0.2, 0.5, 1.0, 1.2]:
+        print()
+        print(&#39;----- diversity:&#39;, diversity)
+
+        generated = &#39;&#39;
+        sentence = self.text[start_index: start_index + self.seq_length]
+        generated += sentence
+        print(&#39;----- Generating with seed: &quot;&#39; + sentence + &#39;&quot;&#39;)
+        sys.stdout.write(generated)
+
+        for i in range(400):
+            x = np.asarray([self.word_to_index[w] for w in sentence]).reshape([1, self.seq_length])
+            preds = self.predict(x)
+            next_index = self._sample(preds, diversity)
+            next_word = self.index_to_word[next_index]
+
+            generated += next_word
+            sentence = sentence[1:] + next_word
+
+            sys.stdout.write(next_word)
+            sys.stdout.flush()
+        print()
+</code></pre>
+<p>生成时，随机挑选一个序列，预测得到结果，再将结果映射为词，循环生成400次。此处使用了diversity的概念，意在对结果再一次采样，以得到不同答案。</p>
+<p>以下是部分结果：</p>
+<pre><code>Iteration: 2
+
+----- diversity: 0.2
+----- Generating with seed: &quot;出战，不胜必斩！”庞&quot;
+出战，不胜必斩！”庞德曰：“吾有一在此，必为何不此？”玄德曰：“吾有一汝之，以为之。”玄德曰：“吾自此，不可为，以此人之。”玄德曰：“吾欲为人，以为何不此？”操曰：“吾自此，以为何，且看下文分解。第人五十一，使人。”玄德曰：“汝为何，今日，以为人，不可之。”玄德曰：“吾有一，以此人有一之。”玄德曰：“此人，以为人，必有一之。”玄德曰：“吾有一汝，以为何不其言？”玄德曰：“吾有一，以为来。”玄德曰：“吾有一如何，且看下文分解。第人有一时，只得引兵来。却说张飞，只得一为了。”操曰：“吾有一时，以为何。”玄德曰：“吾有一言，以此人也。”玄德曰：“吾自此，不可之。”玄德曰：“吾有一时，不可也。”玄德曰：“吾有一时，只得有一为，以为何不来？”遂大将，张飞为令人，使人。”玄德曰：“吾欲为何，且看下文分解。第人大惊，以为大，以为何不此也？”玄德曰：“吾欲为何，且看下文分解。第人在前，使人。”玄德曰：“吾有一时，不可为之。”
+
+----- diversity: 0.5
+----- Generating with seed: &quot;出战，不胜必斩！”庞&quot;
+出战，不胜必斩！”庞德大将军马，张飞前见玄德，只见张辽、张飞，皆来。”遂旗号遂大败，使后人有一于””遂令，引日入寨，只见孙策为住。”玄德曰：“吾有一便，只得此人，使许都督，即孔明为使人，以上马，遂引兵来。”玄德曰：“汝为何？”正欲使入，遂出当口。”众皆奏曰：“吾有张辽，以为郡。”瑜曰：“今若公非手，不不为天”！”，搬兵大，忽报知关公曰：“吾为方计，以取无人，以有一人，有一而来。”玄德曰：“今吾无计，以何不其来，以为原。”玄德曰：“吾在此，以为者。”。战不引兵，以为韩遂。”孔明曰：“某有一于”””””遂，只得起兵，先为不出。”绍曰：“此人一兵，只得天下，以为同；一议，以用为多，不可守。”玄德曰：“汝非死于此，不可之。”瑜曰：“汝自引兵者不出。”操曰：“今若得其人，如此人，皆使人之。”玄德曰：“先生先了，今日，却得黄忠探得一入，何曰：“汝为人，乃之。”孔明曰：“不然后，不可君也。吾如何不之？”遂急到，大于后人也。
+
+----- diversity: 1.0
+----- Generating with seed: &quot;出战，不胜必斩！”庞&quot;
+出战，不胜必斩！”庞德有张，而来。二人与言！”二绍急闻将骑去了了，不可护弟如开策一十，各兵当夺。，入荆州，皆口而奉，金密有奉罪。”绍曰：“吾朝曰：“张玄德此人主不可生、守来，曹操为了他军，各通无，不大事矣。李傕都督民告正。曹操来于马前故面奏曰：“次左将于表孔明留二人皆太守外。马二公大，即去高刀军。且为拜兴路。却说张飞王便欲；大马二十二报：“船无左右也，勿当马作血阵，随盛不用数。又见以心乃赐之使者，帝高郡者曰：“汝得王蜀来乃为。”即下来，使了行，欲赏耶？”将甲见玄德，然不；败甲守计，聚众路已其城。魏，尽不见吕布良不玄德旗号。汝召当高余魏延赵云，以定不之。人马败军郡，传请小射出。且备兵，名命。。赵云在五关军，回投：“等亦一风九曰：“幸，使孙权之太孔瑜；将百笑；左领兵北而年举。却说刘繇知谢天子曹操，未绝前；上丞相人白家。”操曰：“我许昌大城与计：其必有王卓，只在王，以有一身人，则五色，使恩余弟，以邓艾君归而之之之而
+
+----- diversity: 1.2
+----- Generating with seed: &quot;出战，不胜必斩！”庞&quot;
+出战，不胜必斩！”庞德黄德名安着料将赶左不追赶，分相攻往回马于一下及为理。但中回头到，引听住昭肯出丁奉分高里召车而走。策近者部，须居文操诗船住射城，有名四人，必风陈：，早君休牛突城、城上太同都一侍矣某言，必馆瑜来？”遂营上要未指曹家相陵敢业：可去议。不知此，必主受起。于是也兵，时一人出迎，何人足一进，不指曹操事，天青里死者事。至安地寨上，名群皆降，不敢数，字名官，两路死破。，何其日新野贼。今汝在兄弟战名人名。”将来书里，。”遂征也。之言计挺枪，魏公月回平曰：“步甚背入内着，然更颜信马曰：“斩相见此。玄德未知左角十数。今若何充教复饮；非夏侯渊车既送恩数日；无阳二人，使被使防骑杀血参好。分布前到星听离城来见后主到果川笑。玄德受而昭。城中徐州本部口军时：一其言，命诸葛亮杀斩了斩之。”平人尚曰：“若去原杀了将，字洛阳。不若孔明之加。军金议已在尽得所耳，则奉见，乃细光为杀先处见杀之，乃臣随矣。却说关上犹毕，以意亦公孙。
+</code></pre></div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2017-03-02</span><i class="fa fa-tag"></i><a href="/categories/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a><a href="/tags/LSTM/" title="LSTM" class="tag">LSTM </a><a href="/tags/Language-Model/" title="Language Model" class="tag">Language Model </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2017/03/02/lstm-language-model/,夜露,基于LSTM的语言模型,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2017/03/03/imdb-sentiment-classification/" title="深度神经网络训练IMDB情感分类的四种方法" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2016/08/03/baidu-news-hot-words/" title="百度新闻热搜词抓取" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end --></body></html>

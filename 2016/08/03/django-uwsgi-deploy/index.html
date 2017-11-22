@@ -1,0 +1,173 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>Django + uWSGI部署 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="英文原文请参照此文：Setting up Django and your web server with uWSGI and nginx 我只是稍微翻译并总结了一下。
+对于Django部署来说，选择nginx和uWSGI是一个不错的选择，此教程旨在将Django部署到生产环境的服务器中。当然你也可以"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>Django + uWSGI部署</a></h3></div><div class="post-content"><p>英文原文请参照此文：<a href="http://uwsgi-docs.readthedocs.org/en/latest/tutorials/Django_and_nginx.html" target="_blank" rel="noopener">Setting up Django and your web server with uWSGI and nginx</a> 我只是稍微翻译并总结了一下。</p>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>对于Django部署来说，选择nginx和uWSGI是一个不错的选择，此教程旨在将Django部署到生产环境的服务器中。当然你也可以使用Apache或者其他的服务器部署方式，不过笔者看来，用uWSGI还是相对简单的。</p>
+<h3 id="概念"><a href="#概念" class="headerlink" title="概念"></a>概念</h3><p>Web Server是面向外界的。它可以提供文件服务，但并不能直接与Django应用通话；它需要一些东西来运行这个应用，将请求从客户端喂给它，并且返回响应。</p>
+<p>Web Server Gateway Interface - WSGI - 就是用来做这件事的。WSGI是一种Python标准。</p>
+<p>uWSGI是WSGI的一种实现。在此教程中，我们将创建uWSGI，以让它创建一个Unix socket，并且通过 WSGI协议来服务于web server的响应。整个最后形式如下：</p>
+<pre><code>the web client &lt;-&gt; the web server &lt;-&gt; the socket &lt;-&gt; uwsgi &lt;-&gt; Django
+</code></pre><h3 id="安装uWSGI之前"><a href="#安装uWSGI之前" class="headerlink" title="安装uWSGI之前"></a>安装uWSGI之前</h3><h4 id="virtualenv"><a href="#virtualenv" class="headerlink" title="virtualenv"></a>virtualenv</h4><p>先确保拥有一个python虚拟环境：</p>
+<pre><code class="bash">virtualenv uwsgi-tutorial  
+cd uwsgi-tutorial  
+source bin/activate
+</code></pre>
+<a id="more"></a>
+<h4 id="安装Django"><a href="#安装Django" class="headerlink" title="安装Django"></a>安装Django</h4><p>将Django安装到你的虚拟环境中，创建一个新的project，并 <code>cd</code> 到这个目录下:</p>
+<pre><code class="bash">pip install Django  
+django-admin.py startproject mysite  
+cd mysite
+</code></pre>
+<h4 id="关于域和端口"><a href="#关于域和端口" class="headerlink" title="关于域和端口"></a>关于域和端口</h4><p>在这篇教程中，我们将称你的域为 example.com，可以自行替换为你的IP。</p>
+<p>通篇我们将使用8000端口来部署web服务，就如Django运行环境默认的一样。当然你也可以换成另外的端口，但注意不要与其他应用冲突。</p>
+<h3 id="基本的uWSGI安装和配置"><a href="#基本的uWSGI安装和配置" class="headerlink" title="基本的uWSGI安装和配置"></a>基本的uWSGI安装和配置</h3><h4 id="在virtualenv中安装uWSGI"><a href="#在virtualenv中安装uWSGI" class="headerlink" title="在virtualenv中安装uWSGI"></a>在virtualenv中安装uWSGI</h4><pre><code class="bash">pip install uwsgi
+</code></pre>
+<p>注意在安装uwsgi之前请确保安装了python开发包，使用Debian系统的话，安装<code>pythonX.Y-dev</code>，X.Y是Python的版本。</p>
+<h4 id="简单测试"><a href="#简单测试" class="headerlink" title="简单测试"></a>简单测试</h4><p>创建一个文件<code>test.py</code>:</p>
+<pre><code class="python"># test.py
+def application(env, start_response):  
+    start_response(&#39;200 OK&#39;, [(&#39;Content-Type&#39;,&#39;text/html&#39;)])
+    return [b&quot;Hello World&quot;] # python3
+    #return [&quot;Hello World&quot;] # python2
+</code></pre>
+<p>运行uWSGI:</p>
+<pre><code class="bash">uwsgi --http :8000 --wsgi-file test.py
+</code></pre>
+<p>参数意义：</p>
+<ul>
+<li>http :8000：使用http协议，8000端口</li>
+<li>wsgi-file test.py：载入特定文件, test.py</li>
+</ul>
+<p>这应该直接在浏览器中返回<code>hello world</code>。访问：</p>
+<pre><code>http://example.com:8000
+</code></pre><p>以检查。如果如此，说明如下配置成功了：</p>
+<pre><code>the web client &lt;-&gt; uWSGI &lt;-&gt; Python
+</code></pre><h4 id="测试你的Django-project"><a href="#测试你的Django-project" class="headerlink" title="测试你的Django project"></a>测试你的Django project</h4><p>现在我们想让uWSGI做同样的是，但是是运行一个Django项目，而不是test.py模块。</p>
+<p>如果你还未这样做过，请确保你的 <code>mysite</code> 项目运行正确：</p>
+<pre><code class="bash">python manage.py runserver 0.0.0.0:8000
+</code></pre>
+<p>如果它成功了，使用uWSGI运行它：</p>
+<pre><code class="bash">uwsgi --http :8000 --module mysite.wsgi
+</code></pre>
+<ul>
+<li><code>module mysite.wsgi</code>：载入特定wsgi模块<br>在浏览器中访问你的服务器，如果出现了网站，说明uWSGI可以服务一个Django应用，在virtualenv中，如下：</li>
+</ul>
+<pre><code>the web client &lt;-&gt; uWSGI &lt;-&gt; Django
+</code></pre><p>现在一般我们不会让浏览器直接与uWSGI对话。这是web server的工作。</p>
+<h3 id="基本的-nginx"><a href="#基本的-nginx" class="headerlink" title="基本的 nginx"></a>基本的 nginx</h3><h4 id="安装-Nginx"><a href="#安装-Nginx" class="headerlink" title="安装 Nginx"></a>安装 Nginx</h4><pre><code class="bash">sudo apt-get install nginx  
+sudo /etc/init.d/nginx start    # start nginx
+</code></pre>
+<p>安装完后检查nginx正在服务，访问80端口，你应该能得到一个“Welcome to nginx!”的返回。说明：</p>
+<pre><code>the web client &lt;-&gt; the web server
+</code></pre><h4 id="为你的网站配置Nginx"><a href="#为你的网站配置Nginx" class="headerlink" title="为你的网站配置Nginx"></a>为你的网站配置Nginx</h4><p>你需要<code>uwsgi_params</code>文件，访问<a href="https://github.com/nginx/nginx/blob/master/conf/uwsgi_params" target="_blank" rel="noopener">GitHub</a>下载。</p>
+<p>复制到你的项目目录。之后我们会通知Nginx来引用它。</p>
+<p>现在，创建一个文件叫做<code>mysite_nginx.conf</code>，然后把这些放进去(可以复制default修改)：</p>
+<pre><code># mysite_nginx.conf
+
+# the upstream component nginx needs to connect to
+upstream django {  
+    # server unix:///path/to/your/mysite/mysite.sock; # for a file socket
+    server 127.0.0.1:8001; # for a web port socket (we&#39;ll use this first)
+}
+
+# configuration of the server
+server {  
+    # the port your site will be served on
+    listen      8000;
+    # the domain name it will serve for
+    server_name .example.com; # substitute your machine&#39;s IP address or FQDN
+    charset     utf-8;
+
+    # max upload size
+    client_max_body_size 75M;   # adjust to taste
+
+    # Django media
+    location /media  {
+        alias /path/to/your/mysite/media;  # your Django project&#39;s media files - amend as required
+    }
+
+    location /static {
+        alias /path/to/your/mysite/static; # your Django project&#39;s static files - amend as required
+    }
+
+    # Finally, send all non-media requests to the Django server.
+    location / {
+        uwsgi_pass  django;
+        include     /path/to/your/mysite/uwsgi_params; # the uwsgi_params file you installed
+    }
+}
+</code></pre><p>这一配置文件告诉nginx从文件系统为文件提供服务，以及处理需要Django的请求。</p>
+<p>创建一个链接以让nginx发现它：</p>
+<pre><code class="bash">sudo ln -s ~/path/to/your/mysite/mysite_nginx.conf /etc/nginx/sites-enabled/
+</code></pre>
+<h4 id="部署静态文件"><a href="#部署静态文件" class="headerlink" title="部署静态文件"></a>部署静态文件</h4><p>在运行nginx之前，要把Django的静态文件集中到static文件夹中。首先你应该修改 mysite/settings.py文件，添加：</p>
+<pre><code class="python">STATIC_ROOT = os.path.join(BASE_DIR, &quot;static/&quot;)
+</code></pre>
+<p>然后执行：</p>
+<pre><code class="bash">python manage.py collectstatic
+</code></pre>
+<h4 id="基本nginx测试"><a href="#基本nginx测试" class="headerlink" title="基本nginx测试"></a>基本nginx测试</h4><p>重启nginx</p>
+<pre><code class="bash">sudo /etc/init.d/nginx restart
+</code></pre>
+<p>为确定Media文件被正确服务，添加一个图片文件<code>media.png</code>到<code>/path/to/your/project/project/media directory</code>目录，然后访问 <a href="http://example.com:8000/media/media.png" target="_blank" rel="noopener">http://example.com:8000/media/media.png</a>。 如果成功，你将会知道至少nginx服务文件是正常的。</p>
+<h3 id="nginx和uWSGI和test-py"><a href="#nginx和uWSGI和test-py" class="headerlink" title="nginx和uWSGI和test.py"></a>nginx和uWSGI和test.py</h3><p>让我们让Nginx来与“hello world” test.py进行通话。</p>
+<pre><code class="bash">uwsgi --socket :8001 --wsgi-file test.py
+</code></pre>
+<p>这几乎与之前的一样，除了参数不同</p>
+<ul>
+<li><code>socket :8001</code>：使用uwsgi协议，8001端口<br>Nginx同时配置完成了，以与uWSGI通信在8001端口通信，并在外部8000端口通信。访问:</li>
+</ul>
+<p><a href="http://example.com:8000/" target="_blank" rel="noopener">http://example.com:8000/</a></p>
+<p>以检查。现在整个stack如下：</p>
+<pre><code>the web client &lt;-&gt; the web server &lt;-&gt; the socket &lt;-&gt; uWSGI &lt;-&gt; Python
+</code></pre><h3 id="使用Unix-sockets代替端口"><a href="#使用Unix-sockets代替端口" class="headerlink" title="使用Unix sockets代替端口"></a>使用Unix sockets代替端口</h3><p>使用TCP端口socket虽然简单，但是最好使用 Unix sockets而不是端口。</p>
+<p>编辑 <code>mysite_nginx.conf</code>：</p>
+<pre><code>server unix:///path/to/your/mysite/mysite.sock; # for a file socket  
+# server 127.0.0.1:8001; # for a web port socket (we&#39;ll use this first)
+</code></pre><p>重启nginx。</p>
+<p>重新运行 uWSGI:</p>
+<pre><code class="bash">uwsgi --socket mysite.sock --wsgi-file test.py
+</code></pre>
+<p>Try <a href="http://example.com:8000/" target="_blank" rel="noopener">http://example.com:8000/</a> in the browser.</p>
+<h4 id="如果不起作用"><a href="#如果不起作用" class="headerlink" title="如果不起作用"></a>如果不起作用</h4><p>检查nginx 错误日志 (/var/log/nginx/error.log)。如果你看到如下：</p>
+<pre><code>connect() to unix:///path/to/your/mysite/mysite.sock failed (13: Permission  
+denied)
+</code></pre><p>说明权限不够，尝试：</p>
+<pre><code class="bash">uwsgi --socket mysite.sock --wsgi-file test.py --chmod-socket=666 # (very permissive)
+</code></pre>
+<p>或者：</p>
+<pre><code class="bash">uwsgi --socket mysite.sock --wsgi-file test.py --chmod-socket=664 # (more sensible)
+</code></pre>
+<h3 id="使用uWSGI和Nginx运行Django项目"><a href="#使用uWSGI和Nginx运行Django项目" class="headerlink" title="使用uWSGI和Nginx运行Django项目"></a>使用uWSGI和Nginx运行Django项目</h3><p>现在运行Django项目:</p>
+<pre><code class="bash">uwsgi --socket mysite.sock --module mysite.wsgi --chmod-socket=664
+</code></pre>
+<p>现在uwsgi和nginx应该在服务你的Django应用，而不是hello world。</p>
+<h3 id="配置uWSGI以使用-ini文件运行"><a href="#配置uWSGI以使用-ini文件运行" class="headerlink" title="配置uWSGI以使用.ini文件运行"></a>配置uWSGI以使用.ini文件运行</h3><p>可以将参数放在文件中，然后运行该文件以运行uwsgi。</p>
+<p>创建一个文件<code>mysite_uwsgi.ini</code>：</p>
+<pre><code># mysite_uwsgi.ini file
+[uwsgi]
+
+# Django-related settings
+# the base directory (full path)
+chdir           = /path/to/your/project  
+# Django&#39;s wsgi file
+module          = project.wsgi  
+# the virtualenv (full path)
+home            = /path/to/virtualenv
+
+# process-related settings
+# master
+master          = true  
+# maximum number of worker processes
+processes       = 10  
+# the socket (use the full path to be safe
+socket          = /path/to/your/project/mysite.sock  
+# ... with appropriate permissions - may be needed
+# chmod-socket    = 664
+# clear environment on exit
+vacuum          = true
+</code></pre><p>使用如下命令运行uwsgi：</p>
+<pre><code class="bash">uwsgi --ini mysite_uwsgi.ini # the --ini option is used to specify a file
+</code></pre>
+<h4 id="附加"><a href="#附加" class="headerlink" title="附加"></a>附加</h4><p>让uwsgi在后台运行：</p>
+<pre><code class="bash">uwsgi --ini mysite_uwsgi.ini --logto mysite.log &amp;
+</code></pre>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-03</span><i class="fa fa-tag"></i><a href="/categories/Technology/" title="Technology" class="tag">Technology </a><a href="/tags/Python/" title="Python" class="tag">Python </a><a href="/tags/Django/" title="Django" class="tag">Django </a><a href="/tags/uWSGI/" title="uWSGI" class="tag">uWSGI </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2016/08/03/django-uwsgi-deploy/,夜露,Django + uWSGI部署,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2016/08/03/baidu-news-hot-words/" title="百度新闻热搜词抓取" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2016/08/03/git-remote-repo/" title="GIT远程仓库" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end --></body></html>

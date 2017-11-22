@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>Caffe for Windows安装与配置 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="转载请注明出处：https://gaussic.github.io
+参照github上happynear的caffe-windows项目，将Caffe for Windows配置成功，并且测试了其转换好的mnist数据库，不论是速度还是结果上，效果都相当好。现总结一下配置方法。
+实验环境
+
+
+操作系"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>Caffe for Windows安装与配置</a></h3></div><div class="post-content"><p>转载请注明出处：<a href="https://gaussic.github.io">https://gaussic.github.io</a></p>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>参照github上happynear的<a href="https://github.com/happynear/caffe-windows" target="_blank" rel="noopener">caffe-windows</a>项目，将Caffe for Windows配置成功，并且测试了其转换好的mnist数据库，不论是速度还是结果上，效果都相当好。现总结一下配置方法。</p>
+<h4 id="实验环境"><a href="#实验环境" class="headerlink" title="实验环境"></a>实验环境</h4><table>
+<thead>
+<tr>
+<th style="text-align:left">操作系统</th>
+<th style="text-align:center">Windows 10 Professional</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">CPU</td>
+<td style="text-align:center">Intel Core i5-4590</td>
+</tr>
+<tr>
+<td style="text-align:left">GPU</td>
+<td style="text-align:center">Nvidia GeForce GTX 970</td>
+</tr>
+<tr>
+<td style="text-align:left">VS</td>
+<td style="text-align:center">Microsoft Visual Studio 2013</td>
+</tr>
+<tr>
+<td style="text-align:left">CUDA</td>
+<td style="text-align:center">CUDA 7.5</td>
+</tr>
+</tbody>
+</table>
+<h4 id="软件安装"><a href="#软件安装" class="headerlink" title="软件安装"></a>软件安装</h4><p>首先需要安装Visual Studio 2013。</p>
+<p>然后再安装CUDA 7.5。注意先后顺序。</p>
+<a id="more"></a>
+<h4 id="配置"><a href="#配置" class="headerlink" title="配置"></a>配置</h4><p>下载整个的<a href="https://github.com/happynear/caffe-windows" target="_blank" rel="noopener">caffe-windows</a>项目，解压缩到所需目录下，例如本文中 D:\caffe。</p>
+<p><img src="/2016/08/02/caffe-for-windows/1.png" alt="1.png"></p>
+<p>下载作者制作的<a href="http://pan.baidu.com/s/1sjIKsc1" target="_blank" rel="noopener">三方库</a>并解压缩到项目的3rdparty目录。解压好后，将3rdparty/bin文件夹加入到环境变量PATH中，这样程序才能找到这些三方dll。</p>
+<h4 id="编译"><a href="#编译" class="headerlink" title="编译"></a>编译</h4><ol>
+<li>双击./src/caffe/proto/extractproto.bat批处理文件来生成caffe.pb.h和caffe.pb.cc两个c++文件，和caffepb2.py这个python使用的文件。</li>
+<li>打开./buildVS2013/MainBuilder.sln，打开之后切换编译模式至Release X64模式。</li>
+<li>修改设置中的compute capability（caffelib –&gt; 属性 –&gt; CUDA C/C++ –&gt; Device –&gt; Code Generation）</li>
+</ol>
+<table>
+<thead>
+<tr>
+<th style="text-align:left">GPU</th>
+<th style="text-align:center">Computer Capability</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td style="text-align:left">GTX660, 680, 760, 770</td>
+<td style="text-align:center">compute_30,sm_30</td>
+</tr>
+<tr>
+<td style="text-align:left">GTX780, Titan Z, Titan Black, K20, K40</td>
+<td style="text-align:center">compute_35,sm_35</td>
+</tr>
+<tr>
+<td style="text-align:left">GTX960, 970, 980, Titan X</td>
+<td style="text-align:center">compute_52,sm_52</td>
+</tr>
+</tbody>
+</table>
+<p><img src="/2016/08/02/caffe-for-windows/3.png" alt="3.png"></p>
+<p>你可以在<a href="https://en.wikipedia.org/wiki/CUDA" target="_blank" rel="noopener">https://en.wikipedia.org/wiki/CUDA</a>上查看你的GPU所对应的Computer Capability。</p>
+<p>点击工具栏绿色箭头进行编译，需要一定时间。</p>
+<p><img src="/2016/08/02/caffe-for-windows/2.png" alt="2.png"></p>
+<h4 id="测试"><a href="#测试" class="headerlink" title="测试"></a>测试</h4><p>下载作者已经转换好的<a href="http://pan.baidu.com/s/1mgl9ndu" target="_blank" rel="noopener">MNIST的leveldb数据文件</a>，解压到./examples/mnist文件夹中，然后运行根目录下的run_mnist.bat即可开始训练，日志会保存在./log文件夹中。可看到，迭代10000次，准确率达到了0.9925。</p>
+<p><img src="/2016/08/02/caffe-for-windows/4.png" alt="4.png"></p>
+<p>若有更新，请到文中所给链接处实时查看。</p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-02</span><i class="fa fa-tag"></i><a href="/categories/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a><a href="/tags/Caffe/" title="Caffe" class="tag">Caffe </a><a href="/tags/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2016/08/02/caffe-for-windows/,夜露,Caffe for Windows安装与配置,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2016/08/03/git-remote-repo/" title="GIT远程仓库" class="btn">上一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- hexo-inject:end --></body></html>

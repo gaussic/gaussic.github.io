@@ -1,0 +1,95 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>GIT远程仓库 · 夜露</title><!-- hexo-inject:begin --><!-- hexo-inject:end --><meta name="description" content="注：此教程仅供本人记录使用。
+
+添加用户，以存放项目# useradd -m git
+# passwd git
+# (输入密码)
+# (再次输入密码)
+
+
+创建本地仓库# su git
+$ cd ~
+$ mkdir test.git
+$ cd test.git
+$ git init
+
+
+添加git用"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"><!-- hexo-inject:begin --><!-- hexo-inject:end --></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post-page"><div class="post animated fadeInDown"><div class="post-title"><h3><a>GIT远程仓库</a></h3></div><div class="post-content"><blockquote>
+<!-- hexo-inject:begin --><!-- hexo-inject:end --><p>注：此教程仅供本人记录使用。</p>
+</blockquote>
+<h4 id="添加用户，以存放项目"><a href="#添加用户，以存放项目" class="headerlink" title="添加用户，以存放项目"></a>添加用户，以存放项目</h4><pre><code class="bash"># useradd -m git
+# passwd git
+# (输入密码)
+# (再次输入密码)
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/1.png" alt="git1"></p>
+<h4 id="创建本地仓库"><a href="#创建本地仓库" class="headerlink" title="创建本地仓库"></a>创建本地仓库</h4><pre><code class="bash"># su git
+$ cd ~
+$ mkdir test.git
+$ cd test.git
+$ git init
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/2-1.png" alt="git2"></p>
+<h4 id="添加git用户名和email"><a href="#添加git用户名和email" class="headerlink" title="添加git用户名和email"></a>添加git用户名和email</h4><pre><code class="bash">$ git config --global user.email &quot;git@xxx.com&quot;
+$ git config --global user.name &quot;git&quot;
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/3.png" alt="git3"></p>
+<h4 id="添加文件并提交"><a href="#添加文件并提交" class="headerlink" title="添加文件并提交"></a>添加文件并提交</h4><pre><code class="bash">$ echo &quot;hello, git&quot; &gt;&gt; test.txt
+$ git add .
+$ git commit -m &quot;initial version&quot;
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/4.png" alt="git4"></p>
+<a id="more"></a>
+<h4 id="建立远程仓库"><a href="#建立远程仓库" class="headerlink" title="建立远程仓库"></a>建立远程仓库</h4><pre><code class="bash">$ git remote add origin ssh://git@this.is.your.ip/~/test.git
+$ git push origin master
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/5-2.png" alt="git5"></p>
+<h4 id="创建另一台机器的ssh-key"><a href="#创建另一台机器的ssh-key" class="headerlink" title="创建另一台机器的ssh-key"></a>创建另一台机器的ssh-key</h4><p>(若之前已创建，本条可忽略)</p>
+<pre><code class="bash">$ ssh-keygen -t rsa -C &quot;dzkang@hotmail.com&quot;
+</code></pre>
+<p>这一步生成了idrsa和idrsa.pub两个文件(windows在用户文件夹找)，将idrsa.pub上传到git用户的.ssh目录下，并添加如authorizedkeys文件内</p>
+<pre><code class="bash">$ cat id_rsa.pub &gt;&gt; authorized_keys
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/6.png" alt="git6"></p>
+<h4 id="使用另一台机器克隆项目"><a href="#使用另一台机器克隆项目" class="headerlink" title="使用另一台机器克隆项目"></a>使用另一台机器克隆项目</h4><p>(windows下打开git bash)</p>
+<pre><code class="bash">$ git clone ssh://git@xx.xx.xx.xx/~/test.git
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/7.png" alt="git7"></p>
+<p>可看到git已经将该项目克隆到本地test文件夹</p>
+<p><img src="/2016/08/03/git-remote-repo/8.png" alt="git8"></p>
+<h4 id="配置一下本机的git用户名和email"><a href="#配置一下本机的git用户名和email" class="headerlink" title="配置一下本机的git用户名和email"></a>配置一下本机的git用户名和email</h4><pre><code class="bash">$ git config --global user.email &quot;dzkang@xxx.com&quot;
+$ git config --global user.name &quot;dzkang&quot;
+</code></pre>
+<h4 id="添加新文件并提交"><a href="#添加新文件并提交" class="headerlink" title="添加新文件并提交"></a>添加新文件并提交</h4><pre><code class="bash">$ echo &quot;just a test&quot; &gt;&gt; test2.txt
+$ git add .
+$ git commit -m &quot;add test2&quot;
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/10.png" alt="git10"></p>
+<h4 id="PUSH到远程仓库"><a href="#PUSH到远程仓库" class="headerlink" title="PUSH到远程仓库"></a>PUSH到远程仓库</h4><pre><code class="bash">$ git push origin master
+</code></pre>
+<p>出现报错信息，被远程仓库拒绝：</p>
+<p><img src="/2016/08/03/git-remote-repo/11.png" alt="git11"></p>
+<p>修改远程仓库 .git/config配置</p>
+<pre><code class="bash">$ git config receive.denyCurrentBranch ignore
+</code></pre>
+<p><img src="/2016/08/03/git-remote-repo/12-1.png" alt="git12"></p>
+<p>这样，每次push成功，在远程服务器输入 git reset –hard能看到最新内容。</p>
+<p>引用网上一段话：</p>
+<p><img src="/2016/08/03/git-remote-repo/13.png" alt="git13"></p>
+</div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-03</span><i class="fa fa-tag"></i><a href="/categories/Technology/" title="Technology" class="tag">Technology </a><a href="/tags/Git/" title="Git" class="tag">Git </a></div></div></div></div><div class="share"><div class="evernote"> <a href="javascript:(function(){EN_CLIP_HOST='http://www.evernote.com';try{var%20x=document.createElement('SCRIPT');x.type='text/javascript';x.src=EN_CLIP_HOST+'/public/bookmarkClipper.js?'+(new%20Date().getTime()/100000);document.getElementsByTagName('head')[0].appendChild(x);}catch(e){location.href=EN_CLIP_HOST+'/clip.action?url='+encodeURIComponent(location.href)+'&amp;title='+encodeURIComponent(document.title);}})();" ref="nofollow" target="_blank" class="fa fa-bookmark"></a></div><div class="weibo"> <a href="javascript:void((function(s,d,e){try{}catch(e){}var f='http://service.weibo.com/share/share.php?',u=d.location.href,p=['url=',e(u),'&amp;title=',e(d.title),'&amp;appkey=2924220432'].join('');function a(){if(!window.open([f,p].join(''),'mb',['toolbar=0,status=0,resizable=1,width=620,height=450,left=',(s.width-620)/2,',top=',(s.height-450)/2].join('')))u.href=[f,p].join('');};if(/Firefox/.test(navigator.userAgent)){setTimeout(a,0)}else{a()}})(screen,document,encodeURIComponent));" class="fa fa-weibo"></a></div><div class="twitter"> <a href="http://twitter.com/home?status=,https://gaussic.github.io/2016/08/03/git-remote-repo/,夜露,GIT远程仓库,;" class="fa fa-twitter"></a></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/2016/08/03/django-uwsgi-deploy/" title="Django + uWSGI部署" class="btn">上一篇</a></li><li class="next pagbuttons"><a role="navigation" href="/2016/08/02/caffe-for-windows/" title="Caffe for Windows安装与配置" class="btn">下一篇</a></li></ul></div></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script><!-- hexo-inject:begin --><!-- Begin: Injected MathJax -->
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Config("");
+</script>
+
+<script type="text/x-mathjax-config">
+  MathJax.Hub.Queue(function() {
+    var all = MathJax.Hub.getAllJax(), i;
+    for(i=0; i < all.length; i += 1) {
+      all[i].SourceElement().parentNode.className += ' has-jax';
+    }
+  });
+</script>
+
+<script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.2/MathJax.js?config=TeX-AMS-MML_HTMLorMML">
+</script>
+<!-- End: Injected MathJax -->
+<!-- hexo-inject:end --></body></html>

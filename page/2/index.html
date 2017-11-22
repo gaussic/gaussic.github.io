@@ -1,0 +1,30 @@
+<!DOCTYPE html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="X-UA-Compatible" content="IE=edge"><meta name="author" content="Gaussic"><title>夜露</title><meta name="description" content="A Blog Powered By Hexo"><meta name="keywords" content="Machine Learning, Deep Learning, NLP, AI, 机器学习, 深度学习, 自然语言处理, 人工智能"><meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0" name="viewport"><meta content="yes" name="apple-mobile-web-app-capable"><meta content="black" name="apple-mobile-web-app-status-bar-style"><meta content="telephone=no" name="format-detection"><meta name="renderer" content="webkit"><link rel="short icon" href="/images/favicon.png" type="image/x-icon"><link rel="stylesheet" href="/css/style.css"><link rel="stylesheet" href="/css/blog_basic.css"><link rel="stylesheet" href="/css/font-awesome.min.css"><link rel="alternate" type="application/atom+xml" title="ATOM 1.0" href="/atom.xml"><link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/styles/github.min.css"></head><body><div class="sidebar animated fadeInDown"><div class="logo-title"><div class="title"><img src="/images/logo@2x.png" style="width:127px;"><h3 title=""><a href="/">夜露</a></h3><div class="description"><p>No good things ever dies.</p></div></div></div><ul class="social-links"><li><a href="https://github.com/gaussic"><i class="fa fa-github"></i></a></li><li><a href="http://weibo.com/2625944715"><i class="fa fa-weibo"></i></a></li></ul><div class="footer"></div></div><div class="main"><div class="page-top animated fadeInDown"><div class="nav"><li><a href="/" class="current">首页</a></li><li><a href="/about">关于</a></li><li><a href="/archives">归档</a></li><li><a href="/tags">标签</a></li></div><div class="information"><div class="back_btn"><li><a onclick="window.history.go(-1)" style="display:none;" class="fa fa-chevron-left"></a></li></div><div class="avatar"><img src="/images/avatar.jpg"></div></div></div><div class="autopagerize_page_element"><div class="content"><div class="post animated fadeInDown"><div class="post-title"><h3><a href="/2017/03/02/lstm-language-model/">基于LSTM的语言模型</a></h3></div><div class="post-content"><p>转载请注明出处：https://gaussic.github.io
+基于Keras的LSTM_text_generation的例子，实现中文的语言模型。
+代码在这里：Github fancywriter
+原先的例子是字符级别的，使用了尼采的作品作为训练集，总的词汇只有57个，因而整个网络相对简单，且训练起来速度比...</p></div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2017-03-02</span><i class="fa fa-tag"></i><a href="/categories/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a><a href="/tags/LSTM/" title="LSTM" class="tag">LSTM </a><a href="/tags/Language-Model/" title="Language Model" class="tag">Language Model </a></div></div></div></div><div class="post animated fadeInDown"><div class="post-title"><h3><a href="/2016/08/03/baidu-news-hot-words/">百度新闻热搜词抓取</a></h3></div><div class="post-content"><p>原抓取网址为：http://news.baidu.com/n?cmd=1&amp;class=reci
+Github代码：点击访问
+转载请注明出处：https://gaussic.github.io
+接口与参数接口的 base_url 为 http://news.baidu.com/n?m=rddata&amp;...</p></div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-03</span><i class="fa fa-tag"></i><a href="/categories/Technology/" title="Technology" class="tag">Technology </a><a href="/tags/Python/" title="Python" class="tag">Python </a><a href="/tags/爬虫/" title="爬虫" class="tag">爬虫 </a></div></div></div></div><div class="post animated fadeInDown"><div class="post-title"><h3><a href="/2016/08/03/django-uwsgi-deploy/">Django + uWSGI部署</a></h3></div><div class="post-content"><p>英文原文请参照此文：Setting up Django and your web server with uWSGI and nginx 我只是稍微翻译并总结了一下。
+对于Django部署来说，选择nginx和uWSGI是一个不错的选择，此教程旨在将Django部署到生产环境的服务器中。当然你也可以使用Apach...</p></div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-03</span><i class="fa fa-tag"></i><a href="/categories/Technology/" title="Technology" class="tag">Technology </a><a href="/tags/Python/" title="Python" class="tag">Python </a><a href="/tags/Django/" title="Django" class="tag">Django </a><a href="/tags/uWSGI/" title="uWSGI" class="tag">uWSGI </a></div></div></div></div><div class="post animated fadeInDown"><div class="post-title"><h3><a href="/2016/08/03/git-remote-repo/">GIT远程仓库</a></h3></div><div class="post-content"><p>
+注：此教程仅供本人记录使用。
+
+添加用户，以存放项目# useradd -m git
+# passwd git
+# (输入密码)
+# (再次输入密码)
+
+
+创建本地仓库# su git
+$ cd ~
+$ mkdir test.git
+$ cd test.git
+$ git init
+
+
+添加git用户名和ema...</p></div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-03</span><i class="fa fa-tag"></i><a href="/categories/Technology/" title="Technology" class="tag">Technology </a><a href="/tags/Git/" title="Git" class="tag">Git </a></div></div></div></div><div class="post animated fadeInDown"><div class="post-title"><h3><a href="/2016/08/02/caffe-for-windows/">Caffe for Windows安装与配置</a></h3></div><div class="post-content"><p>转载请注明出处：https://gaussic.github.io
+参照github上happynear的caffe-windows项目，将Caffe for Windows配置成功，并且测试了其转换好的mnist数据库，不论是速度还是结果上，效果都相当好。现总结一下配置方法。
+实验环境
+
+
+操作系统
+Windo...</p></div><div class="post-footer"><div class="meta"><div class="info"><i class="fa fa-sun-o"></i><span class="date">2016-08-02</span><i class="fa fa-tag"></i><a href="/categories/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a><a href="/tags/Caffe/" title="Caffe" class="tag">Caffe </a><a href="/tags/Deep-Learning/" title="Deep Learning" class="tag">Deep Learning </a></div></div></div></div><div class="pagination"><ul class="clearfix"><li class="pre pagbuttons"><a role="navigation" href="/" class="btn">上一页</a></li></ul></div></div></div></div><script src="/js/jquery.js"></script><script src="/js/jquery-migrate-1.2.1.min.js"></script><script src="/js/jquery.appear.js"></script><script src="//cdnjs.cloudflare.com/ajax/libs/highlight.js/9.9.0/highlight.min.js"></script><script>hljs.initHighlightingOnLoad();</script></body></html>
